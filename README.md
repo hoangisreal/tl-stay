@@ -1,6 +1,6 @@
 # TL-Stay
 
-Homestay booking website (Airbnb-style) — đồ án học phần MERN Stack.
+Homestay booking website (Airbnb-style) — đồ án học phần.
 
 ## Tech Stack
 - **Backend:** Node.js, Express.js, MongoDB (Mongoose), JWT
