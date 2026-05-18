@@ -142,9 +142,56 @@ A homestay booking demo (Airbnb-style) built with the MERN stack and Tailwind CS
 
 ---
 
+## Phase 7 — Core UX Features (Airbnb Parity)
+
+### Backend
+- [x] `Listing` model updates: add `category` (enum), `cleaningFee`, `avgRating`, `reviewCount`.
+- [x] `Booking` model updates: add `nights`, `subtotal`, `cleaningFee`, `serviceFee`, `tax` for price breakdown.
+- [x] `User` model updates: add `favoriteListings` (array of listing IDs).
+- [x] `Review` model: `listing` (ref), `booking` (ref, unique), `guest` (ref), `rating`, sub-ratings, `comment`.
+- [x] `pricing` helper: compute full breakdown (subtotal, cleaning fee, service fee, tax, total).
+- [x] `reviewController`: `create` (one per completed booking), `listByListing`, `delete`, `myPendingReviews`.
+- [x] `wishlistController`: `toggle`, `list`.
+- [x] Routes: `/api/reviews`, `/api/wishlist`.
+- [x] Update `listingController`: category filter support, cascade delete reviews on listing delete.
+- [x] Update `bookingController`: store full breakdown, add public `quote` endpoint.
+- [x] Seed script updates: categories, cleaning fees, ratings, reviews on past bookings, sample favorites.
+
+### Frontend
+- [x] `lib/categories.ts`: category definitions with icons.
+- [x] `lib/images.ts`: image URL resolution helper.
+- [x] `services/reviewService.ts`: review API calls.
+- [x] `services/wishlistService.ts`: wishlist API calls.
+- [x] `services/bookingService.ts`: add `PriceBreakdown` type and `fetchPriceQuote`.
+- [x] `services/listingService.ts`: add category, fees, ratings to `Listing` type.
+- [x] `services/authService.ts`: add `favoriteListings` to `AuthUser`.
+- [x] `store/authStore.ts`: add `setFavorites` action.
+- [x] `CategoryTabs` component: horizontal scrollable category filter.
+- [x] `RatingStars` component: display 1-5 stars with optional interactivity.
+- [x] `FavoriteButton` component: heart icon with toggle functionality.
+- [x] `ImageLightbox` component: full-screen image viewer with keyboard navigation.
+- [x] `PriceBreakdown` component: display detailed price breakdown.
+- [x] `ReviewList` component: display reviews with guest info and ratings.
+- [x] `ReviewForm` component: form to submit review with rating and comment.
+- [x] `ListingCard` updates: add rating display and favorite button.
+- [x] `HomePage` updates: add `CategoryTabs` component.
+- [x] `ListingDetailsPage` updates: add reviews section, image lightbox, rating display.
+- [x] `MyBookingsPage` updates: show price breakdown for each booking.
+- [x] `BookingConfirmationPage` updates: show price breakdown.
+- [x] `WishlistPage` component: grid view of favorited listings.
+- [x] `Navbar` updates: add wishlist link for authenticated users.
+- [x] `AppRouter` updates: add `/wishlist` route with `ProtectedRoute`.
+
+---
+
 ## Done Criteria
-- [ ] Guests can register, search, filter, view, and book a homestay.
-- [ ] Hosts can register, create/edit/delete listings, and view their bookings.
-- [ ] No double-booking possible.
-- [ ] Responsive Tailwind UI with consistent components and error handling.
-- [ ] Codebase contains zero comments and uses descriptive naming throughout.
+- [x] Guests can register, search, filter, view, and book a homestay.
+- [x] Hosts can register, create/edit/delete listings, and view their bookings.
+- [x] No double-booking possible.
+- [x] Responsive Tailwind UI with consistent components and error handling.
+- [x] Codebase contains zero comments and uses descriptive naming throughout.
+- [x] Reviews and ratings system functional.
+- [x] Wishlist/favorites system functional.
+- [x] Detailed price breakdown displayed on bookings.
+- [x] Listing categories with filtering functional.
+- [x] Image lightbox for viewing listing photos.
