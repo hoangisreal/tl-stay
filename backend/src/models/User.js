@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['guest', 'host'], default: 'guest' },
     avatarUrl: { type: String, default: '' },
+    favoriteListings: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Listing' }],
   },
   { timestamps: true }
 );

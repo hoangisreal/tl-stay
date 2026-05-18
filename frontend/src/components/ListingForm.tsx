@@ -7,6 +7,7 @@ import FormField from './FormField.tsx';
 import FormError from './FormError.tsx';
 import AmenityPicker from './AmenityPicker.tsx';
 import ImageUploader from './ImageUploader.tsx';
+import { resolveImageUrl } from '../lib/images.ts';
 
 const listingSchema = z.object({
   title: z.string().min(3, 'Tiêu đề phải có ít nhất 3 ký tự'),
@@ -106,9 +107,7 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
         <span className="text-sm font-medium text-gray-700">Ảnh phòng</span>
         <ImageUploader
           onChange={setImageFiles}
-          existingImages={listing?.images.map((img) =>
-            `${import.meta.env.VITE_API_URL?.replace('/api', '')}${img}`
-          )}
+          existingImages={listing?.images.map(resolveImageUrl)}
         />
       </div>
       <div className="flex gap-3 pt-2">

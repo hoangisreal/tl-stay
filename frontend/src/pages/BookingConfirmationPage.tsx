@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { fetchBookingById, type Booking } from '../services/bookingService.ts';
+import PriceBreakdown from '../components/PriceBreakdown.tsx';
 
 export default function BookingConfirmationPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,12 +25,16 @@ export default function BookingConfirmationPage() {
         <div className="text-5xl mb-4">🎉</div>
         <h1 className="text-2xl font-bold text-gray-800 mb-2">Đặt phòng thành công!</h1>
         <p className="text-gray-500 text-sm mb-6">Cảm ơn bạn đã đặt phòng tại TL-Stay.</p>
-        <div className="text-left bg-gray-50 rounded-xl p-4 space-y-2 text-sm mb-6">
-          <p><span className="font-medium text-gray-700">Phòng:</span> {booking.listing.title}</p>
-          <p><span className="font-medium text-gray-700">Nhận phòng:</span> {checkIn}</p>
-          <p><span className="font-medium text-gray-700">Trả phòng:</span> {checkOut}</p>
-          <p><span className="font-medium text-gray-700">Số khách:</span> {booking.guests}</p>
-          <p><span className="font-medium text-gray-700">Tổng tiền:</span> {booking.totalPrice.toLocaleString('vi-VN')}đ</p>
+        <div className="text-left bg-gray-50 rounded-xl p-4 space-y-4 text-sm mb-6">
+          <div className="space-y-2">
+            <p><span className="font-medium text-gray-700">Phòng:</span> {booking.listing.title}</p>
+            <p><span className="font-medium text-gray-700">Nhận phòng:</span> {checkIn}</p>
+            <p><span className="font-medium text-gray-700">Trả phòng:</span> {checkOut}</p>
+            <p><span className="font-medium text-gray-700">Số khách:</span> {booking.guests}</p>
+          </div>
+          {booking.nights > 0 && (
+            <PriceBreakdown pricePerNight={booking.listing.pricePerNight} breakdown={booking} />
+          )}
         </div>
         <div className="flex gap-3">
           <Link to="/my-bookings" className="flex-1 bg-rose-500 hover:bg-rose-600 text-white font-medium py-2.5 rounded-xl text-sm transition-colors text-center">

@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { fetchMyListings, createListing, updateListing, deleteListing, type Listing } from '../services/listingService.ts';
 import ListingForm from '../components/ListingForm.tsx';
+import { resolveFirstImage } from '../lib/images.ts';
 
 export default function HostDashboardPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Listing | null>(null);
-  const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
   const loadListings = () => {
     fetchMyListings().then((res) => setListings(res.data)).finally(() => setLoading(false));
@@ -69,7 +69,7 @@ export default function HostDashboardPage() {
       ) : (
         <div className="space-y-4">
           {listings.map((listing) => {
-            const img = listing.images[0] ? `${baseUrl}${listing.images[0]}` : 'https://placehold.co/120x80?text=No+Img';
+            const img = resolveFirstImage(listing.images);
             return (
               <div key={listing._id} className="flex gap-4 bg-white border border-gray-200 rounded-2xl p-4 items-center">
                 <img src={img} alt={listing.title} className="w-28 h-20 object-cover rounded-xl shrink-0" />

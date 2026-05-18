@@ -19,6 +19,7 @@ interface AuthState {
   }) => Promise<void>;
   logout: () => Promise<void>;
   fetchMe: () => Promise<void>;
+  setFavorites: (listingIds: string[]) => void;
 }
 
 const useAuthStore = create<AuthState>((set) => ({
@@ -48,6 +49,9 @@ const useAuthStore = create<AuthState>((set) => ({
       set({ user: null, loading: false });
     }
   },
+
+  setFavorites: (listingIds) =>
+    set((state) => (state.user ? { user: { ...state.user, favoriteListings: listingIds } } : state)),
 }));
 
 export default useAuthStore;

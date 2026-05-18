@@ -1,5 +1,6 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import SearchBar from '../components/SearchBar.tsx';
+import CategoryTabs from '../components/CategoryTabs.tsx';
 import FiltersPanel from '../components/FiltersPanel.tsx';
 import ListingGrid from '../components/ListingGrid.tsx';
 import Pagination from '../components/Pagination.tsx';
@@ -24,6 +25,7 @@ export default function HomePage() {
       <div className="flex justify-center">
         <SearchBar />
       </div>
+      <CategoryTabs />
       <FiltersPanel />
       {loading && <LoadingSkeleton />}
       {error && <ErrorState message={error} />}

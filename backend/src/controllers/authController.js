@@ -70,6 +70,6 @@ export const logout = (req, res) => {
 };
 
 export const me = (req, res) => {
-  const { _id, name, email, role, avatarUrl } = req.user;
-  res.json({ _id, name, email, role, avatarUrl });
+  const { _id, name, email, role, avatarUrl, favoriteListings } = req.user;
+  res.json({ _id, name, email, role, avatarUrl, favoriteListings: favoriteListings || [] });
 };

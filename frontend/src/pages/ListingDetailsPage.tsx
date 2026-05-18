@@ -2,49 +2,92 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchListingById, type Listing } from '../services/listingService.ts';
 import BookingWidget from '../components/BookingWidget.tsx';
+import { resolveImageUrl } from '../lib/images.ts';
+import ImageLightbox from '../components/ImageLightbox.tsx';
+import ReviewList from '../components/ReviewList.tsx';
+import RatingStars from '../components/RatingStars.tsx';
+import FavoriteButton from '../components/FavoriteButton.tsx';
+import useAuth from '../hooks/useAuth.ts';
+import { fetchListingReviews, type Review } from '../services/reviewService.ts';
 
 export default function ListingDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeImg, setActiveImg] = useState(0);
-  const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!id) return;
     fetchListingById(id)
       .then((res) => setListing(res.data))
       .finally(() => setLoading(false));
+    fetchListingReviews(id)
+      .then((res) => setReviews(res.data))
+      .finally(() => setReviewsLoading(false));
   }, [id]);
 
   if (loading) return <div className="flex justify-center py-20">Đang tải...</div>;
   if (!listing) return <div className="flex justify-center py-20 text-gray-500">Không tìm thấy phòng</div>;
 
   const images = listing.images.length
-    ? listing.images.map((img) => `${baseUrl}${img}`)
-    : ['https://placehold.co/800x500?text=No+Image'];
+    ? listing.images.map(resolveImageUrl)
+    : [resolveImageUrl(null)];
+
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-2">{listing.title}</h1>
-      <p className="text-sm text-gray-500 mb-6">{listing.location.address}, {listing.location.city}, {listing.location.country}</p>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">{listing.title}</h1>
+          <p className="text-sm text-gray-500">{listing.location.address}, {listing.location.city}, {listing.location.country}</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <RatingStars value={listing.avgRating || 0} size="sm" readOnly />
+            <span className="text-sm text-gray-600">({listing.reviewCount || 0} đánh giá)</span>
+          </div>
+          {user && <FavoriteButton listingId={listing._id} />}
+        </div>
+      </div>
 
       <div className="mb-8">
-        <img src={images[activeImg]} alt={listing.title} className="w-full h-80 object-cover rounded-2xl mb-2" />
+        <img
+          src={images[0]}
+          alt={listing.title}
+          className="w-full h-80 object-cover rounded-2xl cursor-pointer"
+          onClick={() => openLightbox(0)}
+        />
         {images.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1 mt-2">
             {images.map((src, i) => (
               <img
                 key={i}
                 src={src}
                 alt=""
-                onClick={() => setActiveImg(i)}
-                className={`h-20 w-28 object-cover rounded-lg cursor-pointer shrink-0 transition ${i === activeImg ? 'ring-2 ring-rose-500' : 'opacity-70 hover:opacity-100'}`}
+                onClick={() => openLightbox(i)}
+                className="h-20 w-28 object-cover rounded-lg cursor-pointer shrink-0 transition opacity-70 hover:opacity-100"
               />
             ))}
           </div>
         )}
       </div>
+
+      {lightboxOpen && (
+        <ImageLightbox
+          images={images}
+          index={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+          onChange={setLightboxIndex}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 space-y-6">
@@ -77,6 +120,19 @@ export default function ListingDetailsPage() {
               </div>
             </div>
           )}
+
+          <div>
+            <h2 className="font-semibold text-gray-800 mb-3">Đánh giá</h2>
+            {reviewsLoading ? (
+              <p className="text-sm text-gray-500">Đang tải đánh giá...</p>
+            ) : (
+              <ReviewList
+                reviews={reviews}
+                avgRating={listing.avgRating || 0}
+                reviewCount={listing.reviewCount || 0}
+              />
+            )}
+          </div>
         </div>
 
         <div>

@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   role: 'guest' | 'host';
   avatarUrl: string;
+  favoriteListings?: string[];
 }
 
 export const registerRequest = (data: {

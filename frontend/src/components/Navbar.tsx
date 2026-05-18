@@ -14,7 +14,12 @@ export default function Navbar() {
         <div className="flex items-center gap-4">
           {!loading && (
             user ? (
-              <AccountMenu />
+              <>
+                <Link to="/wishlist" className="text-sm font-medium text-gray-700 hover:text-gray-900 flex items-center gap-1">
+                  <span>❤️</span> Yêu thích
+                </Link>
+                <AccountMenu />
+              </>
             ) : (
               <>
                 <Link to="/login" className="text-sm font-medium text-gray-700 hover:text-gray-900">

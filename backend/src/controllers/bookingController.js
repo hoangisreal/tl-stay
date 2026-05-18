@@ -2,7 +2,7 @@ import { z } from 'zod';
 import Booking from '../models/Booking.js';
 import Listing from '../models/Listing.js';
 import { hasOverlap } from '../utils/availability.js';
-import { calculateTotalPrice } from '../utils/pricing.js';
+import { computeBreakdown } from '../utils/pricing.js';
 
 const bookingSchema = z.object({
   listing: z.string(),
@@ -52,14 +52,19 @@ export const create = async (req, res, next) => {
       return next(new Error('Dates are not available'));
     }
 
-    const totalPrice = calculateTotalPrice(checkIn, checkOut, listing.pricePerNight);
+    const breakdown = computeBreakdown(
+      checkIn,
+      checkOut,
+      listing.pricePerNight,
+      listing.cleaningFee || 0
+    );
     const booking = await Booking.create({
       listing: listingId,
       guest: req.user._id,
       checkIn: checkInDate,
       checkOut: checkOutDate,
       guests,
-      totalPrice,
+      ...breakdown,
     });
 
     if (await hasOverlap(listingId, checkIn, checkOut, booking._id)) {
@@ -120,6 +125,25 @@ export const cancel = async (req, res, next) => {
     booking.status = 'cancelled';
     await booking.save();
     res.json(booking);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const quote = async (req, res, next) => {
+  try {
+    const { listing: listingId, checkIn, checkOut } = req.query;
+    if (!listingId || !checkIn || !checkOut) {
+      res.status(400);
+      return next(new Error('listing, checkIn and checkOut are required'));
+    }
+    const listing = await Listing.findById(listingId).select('pricePerNight cleaningFee');
+    if (!listing) {
+      res.status(404);
+      return next(new Error('Listing not found'));
+    }
+    const breakdown = computeBreakdown(checkIn, checkOut, listing.pricePerNight, listing.cleaningFee || 0);
+    res.json(breakdown);
   } catch (err) {
     next(err);
   }

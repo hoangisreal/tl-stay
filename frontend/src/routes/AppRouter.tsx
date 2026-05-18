@@ -10,6 +10,7 @@ import HostDashboardPage from '../pages/HostDashboardPage.tsx';
 import MyBookingsPage from '../pages/MyBookingsPage.tsx';
 import HostBookingsPage from '../pages/HostBookingsPage.tsx';
 import BookingConfirmationPage from '../pages/BookingConfirmationPage.tsx';
+import WishlistPage from '../pages/WishlistPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 import ErrorPage from '../pages/ErrorPage.tsx';
 
@@ -25,6 +26,14 @@ export default function AppRouter() {
             element={
               <ProtectedRoute>
                 <MyBookingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wishlist"
+            element={
+              <ProtectedRoute>
+                <WishlistPage />
               </ProtectedRoute>
             }
           />

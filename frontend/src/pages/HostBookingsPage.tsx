@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchHostBookings, cancelBooking, type Booking } from '../services/bookingService.ts';
 import Badge from '../components/Badge.tsx';
+import { resolveFirstImage } from '../lib/images.ts';
 
 export default function HostBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
   useEffect(() => {
     fetchHostBookings().then((res) => setBookings(res.data)).finally(() => setLoading(false));
@@ -31,9 +31,7 @@ export default function HostBookingsPage() {
       ) : (
         <div className="space-y-4">
           {bookings.map((booking) => {
-            const img = booking.listing.images?.[0]
-              ? `${baseUrl}${booking.listing.images[0]}`
-              : 'https://placehold.co/120x80?text=No+Img';
+            const img = resolveFirstImage(booking.listing.images);
             const checkIn = new Date(booking.checkIn).toLocaleDateString('vi-VN');
             const checkOut = new Date(booking.checkOut).toLocaleDateString('vi-VN');
             return (

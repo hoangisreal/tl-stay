@@ -12,12 +12,17 @@ export interface ListingHost {
   avatarUrl: string;
 }
 
+export type ListingCategory =
+  | 'beach' | 'mountain' | 'city' | 'cabin' | 'countryside'
+  | 'lakeside' | 'tropical' | 'pool' | 'design';
+
 export interface Listing {
   _id: string;
   host: ListingHost;
   title: string;
   description: string;
   pricePerNight: number;
+  cleaningFee: number;
   maxGuests: number;
   bedrooms: number;
   beds: number;
@@ -25,6 +30,9 @@ export interface Listing {
   location: ListingLocation;
   amenities: string[];
   images: string[];
+  category: ListingCategory;
+  avgRating: number;
+  reviewCount: number;
   isActive: boolean;
   createdAt: string;
 }
@@ -42,6 +50,7 @@ export interface ListingFilters {
   minPrice?: string;
   maxPrice?: string;
   guests?: string;
+  category?: string;
   checkIn?: string;
   checkOut?: string;
   page?: string;

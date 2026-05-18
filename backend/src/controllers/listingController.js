@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Listing from '../models/Listing.js';
 import Booking from '../models/Booking.js';
+import Review from '../models/Review.js';
 import { getBookedRanges } from '../utils/availability.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,10 +24,13 @@ const removeImageFiles = async (images = []) => {
   );
 };
 
+const CATEGORIES = ['beach', 'mountain', 'city', 'cabin', 'countryside', 'lakeside', 'tropical', 'pool', 'design'];
+
 const listingSchema = z.object({
   title: z.string().min(3),
   description: z.string().min(10),
   pricePerNight: z.coerce.number().positive(),
+  cleaningFee: z.coerce.number().min(0).optional(),
   maxGuests: z.coerce.number().int().min(1),
   bedrooms: z.coerce.number().int().min(1).optional(),
   beds: z.coerce.number().int().min(1).optional(),
@@ -35,6 +39,7 @@ const listingSchema = z.object({
   address: z.string().min(5),
   country: z.string().optional(),
   amenities: z.string().optional(),
+  category: z.enum(CATEGORIES).optional(),
 });
 
 export const create = async (req, res, next) => {
@@ -61,10 +66,11 @@ export const create = async (req, res, next) => {
 
 export const getAll = async (req, res, next) => {
   try {
-    const { location, minPrice, maxPrice, guests, checkIn, checkOut, page = 1, limit = 12, sort = '-createdAt' } = req.query;
+    const { location, minPrice, maxPrice, guests, category, checkIn, checkOut, page = 1, limit = 12, sort = '-createdAt' } = req.query;
     const filter = { isActive: true };
 
     if (location) filter['location.city'] = { $regex: location, $options: 'i' };
+    if (category && CATEGORIES.includes(category)) filter.category = category;
     if (minPrice || maxPrice) {
       filter.pricePerNight = {};
       if (minPrice) filter.pricePerNight.$gte = Number(minPrice);
@@ -149,6 +155,7 @@ export const deleteListing = async (req, res, next) => {
   try {
     await removeImageFiles(req.listing.images);
     await Booking.deleteMany({ listing: req.params.id });
+    await Review.deleteMany({ listing: req.params.id });
     await Listing.findByIdAndDelete(req.params.id);
     res.json({ message: 'Listing deleted' });
   } catch (err) {

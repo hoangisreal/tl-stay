@@ -1,0 +1,125 @@
+import { z } from 'zod';
+import Review from '../models/Review.js';
+import Booking from '../models/Booking.js';
+import Listing from '../models/Listing.js';
+
+const reviewSchema = z.object({
+  booking: z.string(),
+  rating: z.coerce.number().int().min(1).max(5),
+  cleanliness: z.coerce.number().int().min(1).max(5).optional(),
+  accuracy: z.coerce.number().int().min(1).max(5).optional(),
+  checkInRating: z.coerce.number().int().min(1).max(5).optional(),
+  communication: z.coerce.number().int().min(1).max(5).optional(),
+  location: z.coerce.number().int().min(1).max(5).optional(),
+  value: z.coerce.number().int().min(1).max(5).optional(),
+  comment: z.string().min(5).max(2000),
+});
+
+const recomputeListingRating = async (listingId) => {
+  const stats = await Review.aggregate([
+    { $match: { listing: listingId } },
+    { $group: { _id: '$listing', avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+  ]);
+  const { avg = 0, count = 0 } = stats[0] || {};
+  await Listing.findByIdAndUpdate(listingId, {
+    avgRating: Math.round(avg * 10) / 10,
+    reviewCount: count,
+  });
+};
+
+export const create = async (req, res, next) => {
+  try {
+    const parsed = reviewSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const { booking: bookingId, ...data } = parsed.data;
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      res.status(404);
+      return next(new Error('Booking not found'));
+    }
+    if (booking.guest.toString() !== req.user._id.toString()) {
+      res.status(403);
+      return next(new Error('Only the guest can review this booking'));
+    }
+    if (booking.status === 'cancelled') {
+      res.status(400);
+      return next(new Error('Cannot review a cancelled booking'));
+    }
+    if (new Date(booking.checkOut) > new Date()) {
+      res.status(400);
+      return next(new Error('You can review only after checkout'));
+    }
+    const existing = await Review.findOne({ booking: bookingId });
+    if (existing) {
+      res.status(409);
+      return next(new Error('You have already reviewed this booking'));
+    }
+
+    const review = await Review.create({
+      ...data,
+      booking: bookingId,
+      listing: booking.listing,
+      guest: req.user._id,
+    });
+    await recomputeListingRating(booking.listing);
+    const populated = await review.populate('guest', 'name avatarUrl');
+    res.status(201).json(populated);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const listByListing = async (req, res, next) => {
+  try {
+    const reviews = await Review.find({ listing: req.params.listingId })
+      .populate('guest', 'name avatarUrl')
+      .sort('-createdAt');
+    res.json(reviews);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const remove = async (req, res, next) => {
+  try {
+    const review = await Review.findById(req.params.id);
+    if (!review) {
+      res.status(404);
+      return next(new Error('Review not found'));
+    }
+    if (review.guest.toString() !== req.user._id.toString()) {
+      res.status(403);
+      return next(new Error('Forbidden'));
+    }
+    const listingId = review.listing;
+    await review.deleteOne();
+    await recomputeListingRating(listingId);
+    res.json({ message: 'Review deleted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const myPendingReviews = async (req, res, next) => {
+  try {
+    const completedBookings = await Booking.find({
+      guest: req.user._id,
+      status: { $ne: 'cancelled' },
+      checkOut: { $lt: new Date() },
+    })
+      .populate('listing', 'title images location')
+      .sort('-checkOut');
+    const reviewedIds = await Review.find({
+      booking: { $in: completedBookings.map((b) => b._id) },
+    }).distinct('booking');
+    const reviewedSet = new Set(reviewedIds.map((id) => id.toString()));
+    const pending = completedBookings.filter((b) => !reviewedSet.has(b._id.toString()));
+    res.json(pending);
+  } catch (err) {
+    next(err);
+  }
+};

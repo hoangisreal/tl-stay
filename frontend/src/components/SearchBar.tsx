@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export default function SearchBar() {
   const navigate = useNavigate();
-  const [location, setLocation] = useState('');
-  const [checkIn, setCheckIn] = useState('');
-  const [checkOut, setCheckOut] = useState('');
-  const [guests, setGuests] = useState('');
+  const [searchParams] = useSearchParams();
+  const today = new Date().toISOString().split('T')[0];
+  const [location, setLocation] = useState(searchParams.get('location') || '');
+  const [checkIn, setCheckIn] = useState(searchParams.get('checkIn') || '');
+  const [checkOut, setCheckOut] = useState(searchParams.get('checkOut') || '');
+  const [guests, setGuests] = useState(searchParams.get('guests') || '');
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +41,7 @@ export default function SearchBar() {
         <span className="text-xs font-semibold text-gray-700">Nhận phòng</span>
         <input
           type="date"
+          min={today}
           value={checkIn}
           onChange={(e) => setCheckIn(e.target.value)}
           className="text-sm outline-none text-gray-700"
@@ -49,6 +52,7 @@ export default function SearchBar() {
         <span className="text-xs font-semibold text-gray-700">Trả phòng</span>
         <input
           type="date"
+          min={checkIn || today}
           value={checkOut}
           onChange={(e) => setCheckOut(e.target.value)}
           className="text-sm outline-none text-gray-700"
