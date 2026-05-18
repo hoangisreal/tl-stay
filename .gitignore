@@ -1,0 +1,9 @@
+node_modules/
+.env
+dist/
+build/
+backend/uploads/listings/*.jpg
+backend/uploads/listings/*.jpeg
+backend/uploads/listings/*.png
+backend/uploads/listings/*.webp
+.DS_Store
