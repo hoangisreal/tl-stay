@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Listing from '../models/Listing.js';
 import Booking from '../models/Booking.js';
+import BookingHold from '../models/BookingHold.js';
 import Review from '../models/Review.js';
 import { getBookedRanges } from '../utils/availability.js';
 
@@ -22,6 +23,17 @@ const removeImageFiles = async (images = []) => {
         } catch {}
       })
   );
+};
+
+const uploadedImagePaths = (files = []) => files.map((f) => `/uploads/listings/${f.filename}`);
+
+const parseAmenities = (value) => {
+  if (!value) return [];
+  const parsed = JSON.parse(value);
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
+    throw new Error('Amenities must be a JSON array of strings');
+  }
+  return parsed;
 };
 
 const CATEGORIES = ['beach', 'mountain', 'city', 'cabin', 'countryside', 'lakeside', 'tropical', 'pool', 'design'];
@@ -43,23 +55,32 @@ const listingSchema = z.object({
 });
 
 export const create = async (req, res, next) => {
+  const images = uploadedImagePaths(req.files);
   try {
     const parsed = listingSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400);
+      await removeImageFiles(images);
       return next(new Error(parsed.error.errors[0].message));
     }
     const { city, address, country, amenities, ...rest } = parsed.data;
-    const images = req.files?.map((f) => `/uploads/listings/${f.filename}`) || [];
+    let amenitiesList;
+    try {
+      amenitiesList = parseAmenities(amenities);
+    } catch (err) {
+      res.status(400);
+      throw err;
+    }
     const listing = await Listing.create({
       ...rest,
       host: req.user._id,
       location: { city, address, country: country || 'Việt Nam' },
-      amenities: amenities ? JSON.parse(amenities) : [],
+      amenities: amenitiesList,
       images,
     });
     res.status(201).json(listing);
   } catch (err) {
+    await removeImageFiles(images);
     next(err);
   }
 };
@@ -105,7 +126,7 @@ export const getAll = async (req, res, next) => {
 
 export const getById = async (req, res, next) => {
   try {
-    const listing = await Listing.findById(req.params.id).populate('host', 'name avatarUrl');
+    const listing = await Listing.findOne({ _id: req.params.id, isActive: true }).populate('host', 'name avatarUrl');
     if (!listing) {
       res.status(404);
       return next(new Error('Listing not found'));
@@ -117,15 +138,17 @@ export const getById = async (req, res, next) => {
 };
 
 export const update = async (req, res, next) => {
+  const newImages = uploadedImagePaths(req.files);
   try {
     const parsed = listingSchema.partial().safeParse(req.body);
     if (!parsed.success) {
       res.status(400);
+      await removeImageFiles(newImages);
       return next(new Error(parsed.error.errors[0].message));
     }
     const { city, address, country, amenities, ...rest } = parsed.data;
     const updateData = { ...rest };
-    if (city || address) {
+    if (city || address || country) {
       updateData.location = {
         ...req.listing.location.toObject(),
         ...(city && { city }),
@@ -133,30 +156,49 @@ export const update = async (req, res, next) => {
         ...(country && { country }),
       };
     }
-    if (amenities !== undefined) updateData.amenities = JSON.parse(amenities);
-    if (req.files?.length) {
-      const newImages = req.files.map((f) => `/uploads/listings/${f.filename}`);
-      const replace = req.body.replaceImages === 'true';
+    if (amenities !== undefined) {
+      try {
+        updateData.amenities = parseAmenities(amenities);
+      } catch (err) {
+        res.status(400);
+        throw err;
+      }
+    }
+    const replace = req.body.replaceImages === 'true';
+    if (newImages.length) {
       if (replace) {
-        await removeImageFiles(req.listing.images);
         updateData.images = newImages;
       } else {
         updateData.images = [...req.listing.images, ...newImages];
       }
     }
     const updated = await Listing.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    if (newImages.length && replace) await removeImageFiles(req.listing.images);
     res.json(updated);
   } catch (err) {
+    await removeImageFiles(newImages);
     next(err);
   }
 };
 
 export const deleteListing = async (req, res, next) => {
   try {
-    await removeImageFiles(req.listing.images);
-    await Booking.deleteMany({ listing: req.params.id });
-    await Review.deleteMany({ listing: req.params.id });
-    await Listing.findByIdAndDelete(req.params.id);
+    const [bookingCount, reviewCount] = await Promise.all([
+      Booking.countDocuments({ listing: req.params.id }),
+      Review.countDocuments({ listing: req.params.id }),
+    ]);
+
+    if (bookingCount > 0 || reviewCount > 0) {
+      req.listing.isActive = false;
+      await req.listing.save();
+      return res.json({ message: 'Listing deactivated' });
+    }
+
+    await Promise.all([
+      removeImageFiles(req.listing.images),
+      BookingHold.deleteMany({ listing: req.params.id }),
+      Listing.findByIdAndDelete(req.params.id),
+    ]);
     res.json({ message: 'Listing deleted' });
   } catch (err) {
     next(err);
@@ -165,7 +207,7 @@ export const deleteListing = async (req, res, next) => {
 
 export const getByHost = async (req, res, next) => {
   try {
-    const listings = await Listing.find({ host: req.user._id }).sort('-createdAt');
+    const listings = await Listing.find({ host: req.user._id, isActive: true }).sort('-createdAt');
     res.json(listings);
   } catch (err) {
     next(err);

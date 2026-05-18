@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import Booking from '../models/Booking.js';
+import BookingHold from '../models/BookingHold.js';
 import Listing from '../models/Listing.js';
-import { hasOverlap } from '../utils/availability.js';
+import { enumerateStayNights, hasOverlap } from '../utils/availability.js';
 import { computeBreakdown } from '../utils/pricing.js';
 
 const bookingSchema = z.object({
@@ -10,6 +11,9 @@ const bookingSchema = z.object({
   checkOut: z.string(),
   guests: z.coerce.number().int().min(1),
 });
+
+const isDuplicateHoldError = (err) =>
+  err?.code === 11000 || err?.writeErrors?.some((writeErr) => writeErr?.code === 11000);
 
 export const create = async (req, res, next) => {
   try {
@@ -42,6 +46,10 @@ export const create = async (req, res, next) => {
       res.status(404);
       return next(new Error('Listing not found'));
     }
+    if (!listing.isActive) {
+      res.status(400);
+      return next(new Error('Listing is not available'));
+    }
     if (guests > listing.maxGuests) {
       res.status(400);
       return next(new Error(`Maximum ${listing.maxGuests} guests allowed`));
@@ -58,7 +66,7 @@ export const create = async (req, res, next) => {
       listing.pricePerNight,
       listing.cleaningFee || 0
     );
-    const booking = await Booking.create({
+    const booking = new Booking({
       listing: listingId,
       guest: req.user._id,
       checkIn: checkInDate,
@@ -67,8 +75,33 @@ export const create = async (req, res, next) => {
       ...breakdown,
     });
 
+    const heldDates = enumerateStayNights(checkInDate, checkOutDate);
+    try {
+      await BookingHold.insertMany(
+        heldDates.map((date) => ({ listing: listingId, booking: booking._id, date })),
+        { ordered: true }
+      );
+    } catch (err) {
+      await BookingHold.deleteMany({ booking: booking._id });
+      if (isDuplicateHoldError(err)) {
+        res.status(409);
+        return next(new Error('Dates are not available'));
+      }
+      throw err;
+    }
+
+    try {
+      await booking.save();
+    } catch (err) {
+      await BookingHold.deleteMany({ booking: booking._id });
+      throw err;
+    }
+
     if (await hasOverlap(listingId, checkIn, checkOut, booking._id)) {
-      await Booking.deleteOne({ _id: booking._id });
+      await Promise.all([
+        Booking.deleteOne({ _id: booking._id }),
+        BookingHold.deleteMany({ booking: booking._id }),
+      ]);
       res.status(409);
       return next(new Error('Dates are not available'));
     }
@@ -124,7 +157,12 @@ export const cancel = async (req, res, next) => {
     }
     booking.status = 'cancelled';
     await booking.save();
-    res.json(booking);
+    await BookingHold.deleteMany({ booking: booking._id });
+    const populated = await booking.populate([
+      { path: 'listing', select: 'title images location pricePerNight host' },
+      { path: 'guest', select: 'name email' },
+    ]);
+    res.json(populated);
   } catch (err) {
     next(err);
   }
@@ -137,10 +175,24 @@ export const quote = async (req, res, next) => {
       res.status(400);
       return next(new Error('listing, checkIn and checkOut are required'));
     }
-    const listing = await Listing.findById(listingId).select('pricePerNight cleaningFee');
+    const listing = await Listing.findById(listingId).select('pricePerNight cleaningFee isActive');
     if (!listing) {
       res.status(404);
       return next(new Error('Listing not found'));
+    }
+    if (!listing.isActive) {
+      res.status(400);
+      return next(new Error('Listing is not available'));
+    }
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    if (Number.isNaN(checkInDate.getTime()) || Number.isNaN(checkOutDate.getTime())) {
+      res.status(400);
+      return next(new Error('Invalid date format'));
+    }
+    if (checkInDate >= checkOutDate) {
+      res.status(400);
+      return next(new Error('Check-out must be after check-in'));
     }
     const breakdown = computeBreakdown(checkIn, checkOut, listing.pricePerNight, listing.cleaningFee || 0);
     res.json(breakdown);
@@ -157,6 +209,13 @@ export const getById = async (req, res, next) => {
     if (!booking) {
       res.status(404);
       return next(new Error('Booking not found'));
+    }
+    const isGuest = booking.guest._id.toString() === req.user._id.toString();
+    const listing = await Listing.findById(booking.listing._id || booking.listing).select('host');
+    const isHost = listing?.host.toString() === req.user._id.toString();
+    if (!isGuest && !isHost) {
+      res.status(403);
+      return next(new Error('Forbidden'));
     }
     res.json(booking);
   } catch (err) {

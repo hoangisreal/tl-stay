@@ -1,5 +1,18 @@
 import Booking from '../models/Booking.js';
 
+export const enumerateStayNights = (checkIn, checkOut) => {
+  const start = new Date(checkIn);
+  const end = new Date(checkOut);
+  start.setUTCHours(0, 0, 0, 0);
+  end.setUTCHours(0, 0, 0, 0);
+
+  const dates = [];
+  for (const d = new Date(start); d < end; d.setUTCDate(d.getUTCDate() + 1)) {
+    dates.push(new Date(d));
+  }
+  return dates;
+};
+
 export const hasOverlap = async (listingId, checkIn, checkOut, excludeBookingId = null) => {
   const query = {
     listing: listingId,

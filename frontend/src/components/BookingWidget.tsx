@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Listing } from '../services/listingService.ts';
-import { createBooking } from '../services/bookingService.ts';
+import { createBooking, fetchPriceQuote, type PriceBreakdown as PriceBreakdownType } from '../services/bookingService.ts';
 import useAuth from '../hooks/useAuth.ts';
+import PriceBreakdown from './PriceBreakdown.tsx';
 
 interface BookingWidgetProps {
   listing: Listing;
@@ -15,6 +16,8 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
   const [checkOut, setCheckOut] = useState('');
   const [guests, setGuests] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quote, setQuote] = useState<PriceBreakdownType | null>(null);
   const [error, setError] = useState('');
 
   const today = new Date().toISOString().split('T')[0];
@@ -24,7 +27,29 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
       ? Math.max(0, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
       : 0;
 
-  const totalPrice = nights * listing.pricePerNight;
+  useEffect(() => {
+    if (!checkIn || !checkOut || nights <= 0) {
+      setQuote(null);
+      return;
+    }
+
+    let cancelled = false;
+    setQuoteLoading(true);
+    fetchPriceQuote({ listing: listing._id, checkIn, checkOut })
+      .then((res) => {
+        if (!cancelled) setQuote(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setQuote(null);
+      })
+      .finally(() => {
+        if (!cancelled) setQuoteLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkIn, checkOut, listing._id, nights]);
 
   const handleBook = async () => {
     if (!user) return navigate('/login');
@@ -100,14 +125,13 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
       </button>
       {nights > 0 && (
         <div className="mt-4 space-y-2 text-sm text-gray-700">
-          <div className="flex justify-between">
-            <span>{listing.pricePerNight.toLocaleString('vi-VN')}đ × {nights} đêm</span>
-            <span>{totalPrice.toLocaleString('vi-VN')}đ</span>
-          </div>
-          <div className="flex justify-between font-bold border-t border-gray-200 pt-2">
-            <span>Tổng cộng</span>
-            <span>{totalPrice.toLocaleString('vi-VN')}đ</span>
-          </div>
+          {quoteLoading ? (
+            <p className="text-sm text-gray-500">Đang tính giá...</p>
+          ) : quote ? (
+            <PriceBreakdown pricePerNight={listing.pricePerNight} breakdown={quote} />
+          ) : (
+            <p className="text-sm text-gray-500">Không thể tính giá cho ngày đã chọn</p>
+          )}
         </div>
       )}
     </div>

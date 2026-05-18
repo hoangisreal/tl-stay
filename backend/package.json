@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
+    "test": "NODE_ENV=test node --test",
     "seed": "node src/utils/seed.js"
   },
   "dependencies": {
@@ -21,6 +22,8 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "mongodb-memory-server": "^11.1.0",
+    "nodemon": "^3.1.7",
+    "supertest": "^7.2.2"
   }
 }

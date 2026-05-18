@@ -4,7 +4,9 @@ import connectDB from '../config/db.js';
 import User from '../models/User.js';
 import Listing from '../models/Listing.js';
 import Booking from '../models/Booking.js';
+import BookingHold from '../models/BookingHold.js';
 import Review from '../models/Review.js';
+import { enumerateStayNights } from './availability.js';
 import { computeBreakdown } from './pricing.js';
 
 const daysFromNow = (n) => {
@@ -23,6 +25,7 @@ const seed = async () => {
     User.deleteMany({}),
     Listing.deleteMany({}),
     Booking.deleteMany({}),
+    BookingHold.deleteMany({}),
     Review.deleteMany({}),
   ]);
 
@@ -196,6 +199,16 @@ const seed = async () => {
   ];
 
   const bookings = await Booking.insertMany(bookingsData);
+  const holds = bookings
+    .filter((booking) => booking.status !== 'cancelled')
+    .flatMap((booking) =>
+      enumerateStayNights(booking.checkIn, booking.checkOut).map((date) => ({
+        listing: booking.listing,
+        booking: booking._id,
+        date,
+      }))
+    );
+  if (holds.length) await BookingHold.insertMany(holds);
 
   const reviewsTemplates = [
     { rating: 5, comment: 'Phòng sạch sẽ, view đẹp như hình. Chủ nhà thân thiện, hỗ trợ nhiệt tình. Sẽ quay lại!' },
