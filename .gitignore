@@ -1,9 +1,12 @@
 node_modules/
 .env
+.env.local
 dist/
 build/
-backend/uploads/listings/*.jpg
-backend/uploads/listings/*.jpeg
-backend/uploads/listings/*.png
-backend/uploads/listings/*.webp
+coverage/
+*.log
+backend/uploads/listings/*
+!backend/uploads/listings/.gitkeep
 .DS_Store
+.idea/
+.vscode/

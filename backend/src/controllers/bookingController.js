@@ -22,11 +22,17 @@ export const create = async (req, res, next) => {
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
 
+    if (Number.isNaN(checkInDate.getTime()) || Number.isNaN(checkOutDate.getTime())) {
+      res.status(400);
+      return next(new Error('Invalid date format'));
+    }
     if (checkInDate >= checkOutDate) {
       res.status(400);
       return next(new Error('Check-out must be after check-in'));
     }
-    if (checkInDate < new Date()) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (checkInDate < today) {
       res.status(400);
       return next(new Error('Check-in cannot be in the past'));
     }
@@ -41,8 +47,7 @@ export const create = async (req, res, next) => {
       return next(new Error(`Maximum ${listing.maxGuests} guests allowed`));
     }
 
-    const overlap = await hasOverlap(listingId, checkIn, checkOut);
-    if (overlap) {
+    if (await hasOverlap(listingId, checkIn, checkOut)) {
       res.status(409);
       return next(new Error('Dates are not available'));
     }
@@ -56,6 +61,12 @@ export const create = async (req, res, next) => {
       guests,
       totalPrice,
     });
+
+    if (await hasOverlap(listingId, checkIn, checkOut, booking._id)) {
+      await Booking.deleteOne({ _id: booking._id });
+      res.status(409);
+      return next(new Error('Dates are not available'));
+    }
 
     const populated = await booking.populate([
       { path: 'listing', select: 'title images location pricePerNight' },

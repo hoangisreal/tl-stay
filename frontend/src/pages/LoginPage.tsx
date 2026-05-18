@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import useAuth from '../hooks/useAuth.ts';
 import FormField from '../components/FormField.tsx';
 import FormError from '../components/FormError.tsx';
@@ -17,6 +17,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [serverError, setServerError] = useState('');
 
   const {
@@ -29,7 +30,8 @@ export default function LoginPage() {
     try {
       setServerError('');
       await login(data.email, data.password);
-      navigate('/');
+      const redirect = searchParams.get('redirect');
+      navigate(redirect && redirect.startsWith('/') ? redirect : '/');
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'response' in err

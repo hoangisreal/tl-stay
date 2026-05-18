@@ -1,7 +1,27 @@
 import { z } from 'zod';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import Listing from '../models/Listing.js';
 import Booking from '../models/Booking.js';
 import { getBookedRanges } from '../utils/availability.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsRoot = path.join(__dirname, '../../uploads');
+
+const removeImageFiles = async (images = []) => {
+  await Promise.all(
+    images
+      .filter((img) => typeof img === 'string' && img.startsWith('/uploads/'))
+      .map(async (img) => {
+        const abs = path.join(uploadsRoot, img.replace(/^\/uploads\//, ''));
+        try {
+          await fs.unlink(abs);
+        } catch {}
+      })
+  );
+};
 
 const listingSchema = z.object({
   title: z.string().min(3),
@@ -109,7 +129,14 @@ export const update = async (req, res, next) => {
     }
     if (amenities !== undefined) updateData.amenities = JSON.parse(amenities);
     if (req.files?.length) {
-      updateData.images = req.files.map((f) => `/uploads/listings/${f.filename}`);
+      const newImages = req.files.map((f) => `/uploads/listings/${f.filename}`);
+      const replace = req.body.replaceImages === 'true';
+      if (replace) {
+        await removeImageFiles(req.listing.images);
+        updateData.images = newImages;
+      } else {
+        updateData.images = [...req.listing.images, ...newImages];
+      }
     }
     const updated = await Listing.findByIdAndUpdate(req.params.id, updateData, { new: true });
     res.json(updated);
@@ -120,6 +147,8 @@ export const update = async (req, res, next) => {
 
 export const deleteListing = async (req, res, next) => {
   try {
+    await removeImageFiles(req.listing.images);
+    await Booking.deleteMany({ listing: req.params.id });
     await Listing.findByIdAndDelete(req.params.id);
     res.json({ message: 'Listing deleted' });
   } catch (err) {
