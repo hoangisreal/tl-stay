@@ -12,7 +12,7 @@ let shuttingDown = false;
 const children = services.map((service) => {
   const child = spawn(npmCmd, service.args, {
     stdio: 'inherit',
-    shell: false,
+    shell: true,
   });
 
   child.on('error', (err) => {

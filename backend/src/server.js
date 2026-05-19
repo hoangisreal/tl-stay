@@ -8,9 +8,16 @@ const PORT = process.env.PORT || 5000;
 
 connectDB()
   .then(async () => {
+    // Tự động seed nếu:
+    // 1. Không phải môi trường production
+    // 2. Không có database thực (dùng in-memory) HOẶC SEED_DEMO_ON_EMPTY được set là true
+    // 3. Database hiện tại đang trống
+    const isInMemory = !process.env.MONGO_URI;
+    const seedEnabled = process.env.SEED_DEMO_ON_EMPTY === 'true' || (isInMemory && process.env.SEED_DEMO_ON_EMPTY !== 'false');
+
     const shouldSeed =
       process.env.NODE_ENV !== 'production' &&
-      process.env.SEED_DEMO_ON_EMPTY === 'true' &&
+      seedEnabled &&
       (await Listing.countDocuments()) === 0;
 
     if (shouldSeed) {

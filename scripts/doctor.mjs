@@ -38,7 +38,7 @@ console.log('TL-Stay local setup check\n');
 check(versionAtLeast(process.version, 20), `Node.js ${process.version}`, 'Install Node.js 20 or newer.');
 
 const npm = npmVersion();
-check(versionAtLeast(npm, 10), npm ? `npm ${npm}` : 'npm not found', 'Install npm 10 or newer.');
+check(npm !== '' && versionAtLeast(npm, 10), npm ? `npm ${npm}` : 'npm not found', 'Install npm 10 or newer.');
 
 check(exists('backend/package.json'), 'backend/package.json exists');
 check(exists('frontend/package.json'), 'frontend/package.json exists');
