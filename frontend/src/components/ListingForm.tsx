@@ -15,6 +15,12 @@ const optionalNumber = z.preprocess(
   z.number().int().min(1).optional()
 );
 
+const optionalDecimal = (min: number, max: number) =>
+  z.preprocess(
+    (value) => (typeof value === 'number' && Number.isNaN(value) ? undefined : value),
+    z.number().min(min).max(max).optional()
+  );
+
 const listingSchema = z.object({
   title: z.string().min(3, 'Tiêu đề phải có ít nhất 3 ký tự'),
   description: z.string().min(10, 'Mô tả phải có ít nhất 10 ký tự'),
@@ -30,6 +36,8 @@ const listingSchema = z.object({
   city: z.string().min(2, 'Vui lòng nhập thành phố'),
   address: z.string().min(5, 'Vui lòng nhập địa chỉ'),
   country: z.string().optional(),
+  lat: optionalDecimal(-90, 90),
+  lng: optionalDecimal(-180, 180),
   category: z.string().optional(),
 });
 
@@ -65,6 +73,8 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
           city: listing.location.city,
           address: listing.location.address,
           country: listing.location.country,
+          lat: listing.location.lat,
+          lng: listing.location.lng,
           category: listing.category,
         }
       : { category: 'city', country: 'Việt Nam' },
@@ -118,6 +128,16 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
         <FormField id="country" label="Quốc gia" error={errors.country} {...register('country')} />
       </div>
       <FormField id="address" label="Địa chỉ" error={errors.address} {...register('address')} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <FormField id="lat" label="Vĩ độ" type="number" step="0.000001" error={errors.lat} {...register('lat', { valueAsNumber: true })} />
+          <p className="mt-1 text-xs text-gray-500">Ví dụ: 16.0678. Bỏ trống nếu chưa có tọa độ.</p>
+        </div>
+        <div>
+          <FormField id="lng" label="Kinh độ" type="number" step="0.000001" error={errors.lng} {...register('lng', { valueAsNumber: true })} />
+          <p className="mt-1 text-xs text-gray-500">Ví dụ: 108.2208. Dùng để hiển thị bản đồ.</p>
+        </div>
+      </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="category" className="text-sm font-medium text-gray-700">Loại phòng</label>
         <select

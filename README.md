@@ -140,6 +140,8 @@ Demo dataset after seed:
   listings for Admin Panel moderation
 - 49 bookings with confirmed, pending, cancelled, past, and future scenarios
 - 24 reviews plus guest wishlists for client-side and admin demos
+- 10 host-guest conversations with 40 messages for inbox/chat demos
+- Listing coordinates for OpenStreetMap previews on detail pages
 
 Demo accounts (password: `password123`):
 - **Admin:** admin@tlstay.com / password123
@@ -183,6 +185,8 @@ curl http://localhost:5000/api/listings
 ### Authentication
 - User registration (Guest/Host roles)
 - Login with JWT (httpOnly cookies)
+- Forgot/reset password with local development reset link
+- Change password for logged-in users
 - Protected routes with role-based access control
 - Auto-redirect on 401 errors
 
@@ -191,6 +195,7 @@ curl http://localhost:5000/api/listings
 - Filter by category (Beach, Mountain, City, Cabin, etc.)
 - Price range filtering
 - Availability check for date ranges
+- Listing coordinates and OpenStreetMap location preview
 - Host dashboard: Create, update, delete listings
 - Image upload (up to 10 images, 5MB each, JPEG/PNG/WebP)
 
@@ -212,6 +217,12 @@ curl http://localhost:5000/api/listings
 - View wishlist page with grid layout
 - Persistent favorites across sessions
 
+### Messaging
+- Guest can message the listing host from listing details
+- Host can message guests from incoming bookings
+- Inbox and conversation pages use REST polling for local-friendly chat demos
+- Admin can inspect recent messages and message counts
+
 ### UI/UX
 - Responsive design with Tailwind CSS
 - Image lightbox for viewing listing photos
@@ -228,6 +239,9 @@ curl http://localhost:5000/api/listings
 - `POST /api/auth/login` - Login
 - `POST /api/auth/logout` - Logout
 - `GET /api/auth/me` - Get current user
+- `POST /api/auth/forgot-password` - Create password reset link
+- `POST /api/auth/reset-password` - Reset password with token
+- `PATCH /api/auth/change-password` - Change password while logged in
 
 ### Listings
 - `GET /api/listings` - Get all listings with filters
@@ -256,6 +270,13 @@ curl http://localhost:5000/api/listings
 - `GET /api/wishlist` - Get user's wishlist
 - `POST /api/wishlist/:listingId/toggle` - Toggle favorite
 
+### Conversations
+- `GET /api/conversations` - Get current user's conversations
+- `POST /api/conversations` - Create or get listing conversation
+- `GET /api/conversations/:id/messages` - Get messages
+- `POST /api/conversations/:id/messages` - Send message
+- `PATCH /api/conversations/:id/read` - Mark conversation as read
+
 ### Admin
 - `GET /api/admin/stats` - Dashboard statistics
 - `GET /api/admin/users` - Manage users
@@ -266,6 +287,7 @@ curl http://localhost:5000/api/listings
 - `PATCH /api/admin/bookings/:id/cancel` - Cancel booking
 - `GET /api/admin/reviews` - Manage reviews
 - `DELETE /api/admin/reviews/:id` - Delete review
+- `GET /api/admin/messages` - Inspect recent messages
 
 ## Database Models
 
@@ -280,7 +302,7 @@ curl http://localhost:5000/api/listings
 - title, description
 - pricePerNight, cleaningFee
 - maxGuests, bedrooms, beds, bathrooms
-- location (country, city, address)
+- location (country, city, address, optional lat/lng)
 - amenities (array)
 - images (array)
 - category (enum)
@@ -300,6 +322,14 @@ curl http://localhost:5000/api/listings
 - guest (User reference)
 - rating, cleanliness, accuracy, checkInRating, communication, location, value
 - comment
+
+### Conversation
+- listing, host, guest
+- lastMessageAt
+
+### Message
+- conversation, sender
+- body, readAt
 
 ## Development Scripts
 

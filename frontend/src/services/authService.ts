@@ -22,3 +22,12 @@ export const loginRequest = (data: { email: string; password: string }) =>
 export const logoutRequest = () => apiClient.post('/auth/logout');
 
 export const getMeRequest = () => apiClient.get<AuthUser>('/auth/me');
+
+export const forgotPasswordRequest = (data: { email: string }) =>
+  apiClient.post<{ message: string; resetLink?: string }>('/auth/forgot-password', data);
+
+export const resetPasswordRequest = (data: { token: string; password: string }) =>
+  apiClient.post<{ message: string }>('/auth/reset-password', data);
+
+export const changePasswordRequest = (data: { currentPassword: string; newPassword: string }) =>
+  apiClient.patch<{ message: string }>('/auth/change-password', data);

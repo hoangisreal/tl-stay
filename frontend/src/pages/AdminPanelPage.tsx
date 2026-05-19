@@ -5,6 +5,7 @@ import {
   deleteAdminReview,
   fetchAdminBookings,
   fetchAdminListings,
+  fetchAdminMessages,
   fetchAdminReviews,
   fetchAdminStats,
   fetchAdminUsers,
@@ -15,15 +16,17 @@ import {
   type AdminUser,
 } from '../services/adminService.ts';
 import type { Booking } from '../services/bookingService.ts';
+import type { AdminMessage } from '../services/conversationService.ts';
 import type { Listing } from '../services/listingService.ts';
 
-type TabKey = 'users' | 'listings' | 'bookings' | 'reviews';
+type TabKey = 'users' | 'listings' | 'bookings' | 'reviews' | 'messages';
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: 'users', label: 'Người dùng' },
   { key: 'listings', label: 'Phòng' },
   { key: 'bookings', label: 'Đặt phòng' },
   { key: 'reviews', label: 'Đánh giá' },
+  { key: 'messages', label: 'Tin nhắn' },
 ];
 
 const roleLabels = {
@@ -42,6 +45,7 @@ export default function AdminPanelPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [messages, setMessages] = useState<AdminMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
@@ -50,18 +54,20 @@ export default function AdminPanelPage() {
     setLoading(true);
     setError('');
     try {
-      const [statsRes, usersRes, listingsRes, bookingsRes, reviewsRes] = await Promise.all([
+      const [statsRes, usersRes, listingsRes, bookingsRes, reviewsRes, messagesRes] = await Promise.all([
         fetchAdminStats(),
         fetchAdminUsers(),
         fetchAdminListings(),
         fetchAdminBookings(),
         fetchAdminReviews(),
+        fetchAdminMessages(),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);
       setListings(listingsRes.data);
       setBookings(bookingsRes.data);
       setReviews(reviewsRes.data);
+      setMessages(messagesRes.data);
     } catch {
       setError('Không thể tải dữ liệu quản trị');
     } finally {
@@ -80,6 +86,7 @@ export default function AdminPanelPage() {
       { label: 'Phòng', value: stats.listings.toLocaleString('vi-VN'), sub: `${stats.activeListings} đang hiển thị · ${stats.inactiveListings} tạm ẩn` },
       { label: 'Đặt phòng', value: stats.bookings.toLocaleString('vi-VN'), sub: `${stats.confirmedBookings} hiệu lực · ${stats.cancelledBookings} đã huỷ` },
       { label: 'Doanh thu', value: fmtMoney(stats.revenue), sub: `${stats.reviews} đánh giá` },
+      { label: 'Tin nhắn', value: stats.messages.toLocaleString('vi-VN'), sub: `${stats.conversations} hội thoại` },
     ];
   }, [stats]);
 
@@ -328,6 +335,39 @@ export default function AdminPanelPage() {
                     Xoá
                   </button>
                 </Td>
+              </tr>
+            ))}
+          </tbody>
+        </AdminTable>
+      )}
+
+      {activeTab === 'messages' && (
+        <AdminTable>
+          <thead className="bg-gray-50">
+            <tr>
+              <Th>Phòng</Th>
+              <Th>Người gửi</Th>
+              <Th>Hội thoại</Th>
+              <Th>Nội dung</Th>
+              <Th>Thời gian</Th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 bg-white">
+            {messages.map((message) => (
+              <tr key={message._id}>
+                <Td>{message.conversation?.listing?.title || 'Listing đã xoá'}</Td>
+                <Td>
+                  <div>{message.sender.name}</div>
+                  <div className="text-xs text-gray-500">{message.sender.email}</div>
+                </Td>
+                <Td>
+                  <div className="text-xs text-gray-500">Host: {message.conversation?.host?.name || '-'}</div>
+                  <div className="text-xs text-gray-500">Guest: {message.conversation?.guest?.name || '-'}</div>
+                </Td>
+                <Td>
+                  <p className="max-w-md text-sm line-clamp-2">{message.body}</p>
+                </Td>
+                <Td>{fmtDate(message.createdAt)}</Td>
               </tr>
             ))}
           </tbody>

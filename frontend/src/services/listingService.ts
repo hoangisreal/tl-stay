@@ -4,6 +4,8 @@ export interface ListingLocation {
   country: string;
   city: string;
   address: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface ListingHost {

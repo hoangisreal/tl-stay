@@ -26,6 +26,9 @@ export default function Navbar() {
                     Admin
                   </Link>
                 )}
+                <Link to="/messages" className="hidden sm:inline text-sm font-medium text-gray-700 hover:text-gray-900">
+                  Tin nhắn
+                </Link>
                 <AccountMenu />
               </>
             ) : (

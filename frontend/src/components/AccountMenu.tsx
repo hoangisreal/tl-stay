@@ -65,6 +65,13 @@ export default function AccountMenu() {
               Admin Panel
             </Link>
           )}
+          <Link
+            to="/messages"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Tin nhắn
+          </Link>
           {user?.role === 'guest' && (
             <Link
               to="/my-bookings"
@@ -74,6 +81,13 @@ export default function AccountMenu() {
               Đặt phòng của tôi
             </Link>
           )}
+          <Link
+            to="/change-password"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Đổi mật khẩu
+          </Link>
           <button
             onClick={handleLogout}
             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"

@@ -1,7 +1,12 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { z } from 'zod';
 import User from '../models/User.js';
+import PasswordResetToken from '../models/PasswordResetToken.js';
 import { signToken, setTokenCookie, clearTokenCookie } from '../utils/jwt.js';
+
+const PASSWORD_RESET_MESSAGE = 'Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được tạo.';
+const RESET_TOKEN_TTL_MS = 1000 * 60 * 30;
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -14,6 +19,30 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(32),
+  password: z.string().min(6),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(6),
+});
+
+const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const firstClientOrigin = () =>
+  (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)[0] || 'http://localhost:5173';
+
+const shouldExposeResetLink = () => ['development', 'test'].includes(process.env.NODE_ENV || 'development');
 
 export const register = async (req, res, next) => {
   try {
@@ -72,4 +101,93 @@ export const logout = (req, res) => {
 export const me = (req, res) => {
   const { _id, name, email, role, avatarUrl, favoriteListings } = req.user;
   res.json({ _id, name, email, role, avatarUrl, favoriteListings: favoriteListings || [] });
+};
+
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+
+    const response = { message: PASSWORD_RESET_MESSAGE };
+    const user = await User.findOne({ email: parsed.data.email });
+    if (!user) return res.json(response);
+
+    await PasswordResetToken.updateMany({ user: user._id, usedAt: null }, { usedAt: new Date() });
+    const token = crypto.randomBytes(32).toString('hex');
+    await PasswordResetToken.create({
+      user: user._id,
+      tokenHash: hashResetToken(token),
+      expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+    });
+
+    if (shouldExposeResetLink()) {
+      response.resetLink = `${firstClientOrigin()}/reset-password/${token}`;
+    }
+    res.json(response);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+
+    const resetToken = await PasswordResetToken.findOne({
+      tokenHash: hashResetToken(parsed.data.token),
+      usedAt: null,
+      expiresAt: { $gt: new Date() },
+    });
+    if (!resetToken) {
+      res.status(400);
+      return next(new Error('Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn'));
+    }
+
+    const user = await User.findById(resetToken.user);
+    if (!user) {
+      res.status(400);
+      return next(new Error('Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn'));
+    }
+
+    user.passwordHash = await bcrypt.hash(parsed.data.password, 10);
+    resetToken.usedAt = new Date();
+    await Promise.all([user.save(), resetToken.save()]);
+    res.json({ message: 'Mật khẩu đã được cập nhật' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const changePassword = async (req, res, next) => {
+  try {
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404);
+      return next(new Error('User not found'));
+    }
+    const match = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
+    if (!match) {
+      res.status(400);
+      return next(new Error('Mật khẩu hiện tại không đúng'));
+    }
+
+    user.passwordHash = await bcrypt.hash(parsed.data.newPassword, 10);
+    await user.save();
+    res.json({ message: 'Mật khẩu đã được cập nhật' });
+  } catch (err) {
+    next(err);
+  }
 };

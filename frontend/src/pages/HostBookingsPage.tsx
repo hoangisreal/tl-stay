@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { fetchHostBookings, cancelBooking, type Booking } from '../services/bookingService.ts';
 import Badge from '../components/Badge.tsx';
 import { resolveFirstImage } from '../lib/images.ts';
+import { createConversation } from '../services/conversationService.ts';
 
 export default function HostBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchHostBookings().then((res) => setBookings(res.data)).finally(() => setLoading(false));
@@ -16,6 +19,16 @@ export default function HostBookingsPage() {
     if (!confirm('Huỷ đặt phòng này?')) return;
     const { data } = await cancelBooking(id);
     setBookings((prev) => prev.map((b) => (b._id === id ? data : b)));
+  };
+
+  const handleMessageGuest = async (booking: Booking) => {
+    setBusyId(booking._id);
+    try {
+      const { data } = await createConversation({ listing: booking.listing._id, guest: booking.guest._id });
+      navigate(`/messages/${data._id}`);
+    } finally {
+      setBusyId('');
+    }
   };
 
   if (loading) return <div className="flex justify-center py-20">Đang tải...</div>;
@@ -50,14 +63,25 @@ export default function HostBookingsPage() {
                     <span className="text-sm font-semibold text-gray-800">{booking.totalPrice.toLocaleString('vi-VN')}đ</span>
                   </div>
                 </div>
-                {booking.status === 'confirmed' && (
-                  <button
-                    onClick={() => handleCancel(booking._id)}
-                    className="text-xs border border-red-200 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50 self-start shrink-0"
-                  >
-                    Huỷ
-                  </button>
-                )}
+                <div className="flex shrink-0 gap-2 self-start">
+                  {booking.status !== 'cancelled' && (
+                    <button
+                      onClick={() => handleMessageGuest(booking)}
+                      disabled={busyId === booking._id}
+                      className="text-xs border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      Nhắn khách
+                    </button>
+                  )}
+                  {booking.status === 'confirmed' && (
+                    <button
+                      onClick={() => handleCancel(booking._id)}
+                      className="text-xs border border-red-200 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50"
+                    >
+                      Huỷ
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

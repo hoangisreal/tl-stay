@@ -63,6 +63,11 @@ export default function LoginPage() {
             error={errors.password}
             {...register('password')}
           />
+          <div className="-mt-2 text-right">
+            <Link to="/forgot-password" className="text-sm font-medium text-rose-500 hover:underline">
+              Quên mật khẩu?
+            </Link>
+          </div>
           <button
             type="submit"
             disabled={isSubmitting}

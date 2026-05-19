@@ -4,6 +4,8 @@ import Listing from '../models/Listing.js';
 import Booking from '../models/Booking.js';
 import BookingHold from '../models/BookingHold.js';
 import Review from '../models/Review.js';
+import Conversation from '../models/Conversation.js';
+import Message from '../models/Message.js';
 import { objectIdSchema } from '../utils/validators.js';
 
 const idParamsSchema = z.object({
@@ -44,6 +46,8 @@ export const getStats = async (_req, res, next) => {
       confirmedBookings,
       cancelledBookings,
       reviews,
+      conversations,
+      messages,
       revenueAgg,
     ] = await Promise.all([
       User.countDocuments(),
@@ -57,6 +61,8 @@ export const getStats = async (_req, res, next) => {
       Booking.countDocuments({ status: { $ne: 'cancelled' } }),
       Booking.countDocuments({ status: 'cancelled' }),
       Review.countDocuments(),
+      Conversation.countDocuments(),
+      Message.countDocuments(),
       Booking.aggregate([
         { $match: { status: { $ne: 'cancelled' } } },
         { $group: { _id: null, total: { $sum: '$totalPrice' } } },
@@ -75,6 +81,8 @@ export const getStats = async (_req, res, next) => {
       confirmedBookings,
       cancelledBookings,
       reviews,
+      conversations,
+      messages,
       revenue: revenueAgg[0]?.total || 0,
     });
   } catch (err) {
@@ -217,6 +225,27 @@ export const deleteReview = async (req, res, next) => {
     await review.deleteOne();
     await recomputeListingRating(listingId);
     res.json({ message: 'Review deleted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const listMessages = async (_req, res, next) => {
+  try {
+    const messages = await Message.find()
+      .populate({
+        path: 'conversation',
+        select: 'listing host guest',
+        populate: [
+          { path: 'listing', select: 'title location' },
+          { path: 'host', select: 'name email avatarUrl' },
+          { path: 'guest', select: 'name email avatarUrl' },
+        ],
+      })
+      .populate('sender', 'name email avatarUrl')
+      .sort('-createdAt')
+      .limit(80);
+    res.json(messages);
   } catch (err) {
     next(err);
   }

@@ -14,6 +14,8 @@ const listingSchema = new mongoose.Schema(
       country: { type: String, default: 'Việt Nam' },
       city: { type: String, required: true },
       address: { type: String, required: true },
+      lat: { type: Number, min: -90, max: 90 },
+      lng: { type: Number, min: -180, max: 180 },
     },
     amenities: [{ type: String }],
     images: [{ type: String }],

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { fetchListingById, type Listing } from '../services/listingService.ts';
 import BookingWidget from '../components/BookingWidget.tsx';
 import { resolveImageUrl } from '../lib/images.ts';
@@ -9,6 +9,7 @@ import RatingStars from '../components/RatingStars.tsx';
 import FavoriteButton from '../components/FavoriteButton.tsx';
 import useAuth from '../hooks/useAuth.ts';
 import { fetchListingReviews, type Review } from '../services/reviewService.ts';
+import { createConversation } from '../services/conversationService.ts';
 
 export default function ListingDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,7 +19,10 @@ export default function ListingDetailsPage() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [messageLoading, setMessageLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!id) return;
@@ -42,6 +46,28 @@ export default function ListingDetailsPage() {
     setLightboxOpen(true);
   };
 
+  const handleMessageHost = async () => {
+    if (!user) return navigate(`/login?redirect=${encodeURIComponent(`/listings/${listing._id}`)}`);
+    if (user.role !== 'guest') return;
+    try {
+      setActionError('');
+      setMessageLoading(true);
+      const { data } = await createConversation({ listing: listing._id });
+      navigate(`/messages/${data._id}`);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setActionError(message || 'Không thể mở hội thoại');
+    } finally {
+      setMessageLoading(false);
+    }
+  };
+
+  const hasCoordinates = typeof listing.location.lat === 'number' && typeof listing.location.lng === 'number';
+  const mapQuery = encodeURIComponent(`${listing.location.address}, ${listing.location.city}, ${listing.location.country}`);
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
@@ -57,6 +83,11 @@ export default function ListingDetailsPage() {
           {user && <FavoriteButton listingId={listing._id} />}
         </div>
       </div>
+      {actionError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {actionError}
+        </div>
+      )}
 
       <div className="mb-8">
         <img
@@ -98,8 +129,19 @@ export default function ListingDetailsPage() {
               </p>
               <p className="text-sm text-gray-500">Chủ nhà: {listing.host.name}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-rose-500 flex items-center justify-center text-white font-bold shrink-0">
-              {listing.host.name.charAt(0).toUpperCase()}
+            <div className="flex items-center gap-3">
+              {(user?.role === 'guest' || !user) && (
+                <button
+                  onClick={handleMessageHost}
+                  disabled={messageLoading}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  {messageLoading ? 'Đang mở...' : 'Nhắn host'}
+                </button>
+              )}
+              <div className="w-10 h-10 rounded-full bg-rose-500 flex items-center justify-center text-white font-bold shrink-0">
+                {listing.host.name.charAt(0).toUpperCase()}
+              </div>
             </div>
           </div>
 
@@ -120,6 +162,26 @@ export default function ListingDetailsPage() {
               </div>
             </div>
           )}
+
+          <div>
+            <h2 className="font-semibold text-gray-800 mb-3">Vị trí</h2>
+            {hasCoordinates ? (
+              <iframe
+                title={`Bản đồ ${listing.title}`}
+                src={`https://www.openstreetmap.org/export/embed.html?bbox=${listing.location.lng! - 0.01}%2C${listing.location.lat! - 0.01}%2C${listing.location.lng! + 0.01}%2C${listing.location.lat! + 0.01}&layer=mapnik&marker=${listing.location.lat}%2C${listing.location.lng}`}
+                className="h-64 w-full rounded-2xl border border-gray-200"
+              />
+            ) : (
+              <a
+                href={`https://www.openstreetmap.org/search?query=${mapQuery}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-medium text-rose-500 hover:underline"
+              >
+                Xem vị trí trên OpenStreetMap
+              </a>
+            )}
+          </div>
 
           <div>
             <h2 className="font-semibold text-gray-800 mb-3">Đánh giá</h2>

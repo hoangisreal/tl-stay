@@ -1,6 +1,7 @@
 import apiClient from './apiClient.ts';
 import type { AuthUser } from './authService.ts';
 import type { Booking } from './bookingService.ts';
+import type { AdminMessage } from './conversationService.ts';
 import type { Listing } from './listingService.ts';
 
 export interface AdminStats {
@@ -15,6 +16,8 @@ export interface AdminStats {
   confirmedBookings: number;
   cancelledBookings: number;
   reviews: number;
+  conversations: number;
+  messages: number;
   revenue: number;
 }
 
@@ -53,3 +56,5 @@ export const fetchAdminReviews = () => apiClient.get<AdminReview[]>('/admin/revi
 
 export const deleteAdminReview = (id: string) =>
   apiClient.delete(`/admin/reviews/${id}`);
+
+export const fetchAdminMessages = () => apiClient.get<AdminMessage[]>('/admin/messages');

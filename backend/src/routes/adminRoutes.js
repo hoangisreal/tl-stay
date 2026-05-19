@@ -5,6 +5,7 @@ import {
   getStats,
   listBookings,
   listListings,
+  listMessages,
   listReviews,
   listUsers,
   updateListingStatus,
@@ -26,5 +27,6 @@ router.get('/bookings', listBookings);
 router.patch('/bookings/:id/cancel', cancelBooking);
 router.get('/reviews', listReviews);
 router.delete('/reviews/:id', deleteReview);
+router.get('/messages', listMessages);
 
 export default router;

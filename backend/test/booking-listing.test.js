@@ -16,6 +16,9 @@ const { default: Listing } = await import('../src/models/Listing.js');
 const { default: Booking } = await import('../src/models/Booking.js');
 const { default: BookingHold } = await import('../src/models/BookingHold.js');
 const { default: Review } = await import('../src/models/Review.js');
+const { default: PasswordResetToken } = await import('../src/models/PasswordResetToken.js');
+const { default: Conversation } = await import('../src/models/Conversation.js');
+const { default: Message } = await import('../src/models/Message.js');
 
 let mongod;
 
@@ -70,6 +73,9 @@ before(async () => {
     Booking.init(),
     BookingHold.init(),
     Review.init(),
+    PasswordResetToken.init(),
+    Conversation.init(),
+    Message.init(),
   ]);
 });
 
@@ -80,7 +86,98 @@ beforeEach(async () => {
     Booking.deleteMany({}),
     BookingHold.deleteMany({}),
     Review.deleteMany({}),
+    PasswordResetToken.deleteMany({}),
+    Conversation.deleteMany({}),
+    Message.deleteMany({}),
   ]);
+});
+
+test('password reset and change password flows are token-safe', async () => {
+  const { agent: guestAgent } = await registerAgent('guest@example.com');
+
+  const missingRes = await request(app)
+    .post('/api/auth/forgot-password')
+    .send({ email: 'missing@example.com' })
+    .expect(200);
+  assert.equal(typeof missingRes.body.message, 'string');
+  assert.equal(missingRes.body.resetLink, undefined);
+
+  const forgotRes = await request(app)
+    .post('/api/auth/forgot-password')
+    .send({ email: 'guest@example.com' })
+    .expect(200);
+  assert.match(forgotRes.body.resetLink, /\/reset-password\//);
+  const token = forgotRes.body.resetLink.split('/reset-password/')[1];
+
+  await request(app)
+    .post('/api/auth/reset-password')
+    .send({ token, password: 'newpassword123' })
+    .expect(200);
+
+  await request(app)
+    .post('/api/auth/reset-password')
+    .send({ token, password: 'anotherpass123' })
+    .expect(400);
+
+  await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'guest@example.com', password: 'password123' })
+    .expect(401);
+
+  await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'guest@example.com', password: 'newpassword123' })
+    .expect(200);
+
+  await guestAgent
+    .patch('/api/auth/change-password')
+    .send({ currentPassword: 'wrong', newPassword: 'changed123' })
+    .expect(400);
+
+  await guestAgent
+    .post('/api/auth/login')
+    .send({ email: 'guest@example.com', password: 'newpassword123' })
+    .expect(200);
+
+  await guestAgent
+    .patch('/api/auth/change-password')
+    .send({ currentPassword: 'newpassword123', newPassword: 'changed123' })
+    .expect(200);
+});
+
+test('conversation messages are only visible to participants', async () => {
+  const { agent: hostAgent, user: host } = await registerAgent('host@example.com', 'host');
+  const { agent: guestAgent } = await registerAgent('guest@example.com');
+  const { agent: otherGuestAgent } = await registerAgent('other@example.com');
+  const listing = await createListing(host);
+
+  const conversationRes = await guestAgent
+    .post('/api/conversations')
+    .send({ listing: listing._id.toString() })
+    .expect(201);
+
+  const messageRes = await guestAgent
+    .post(`/api/conversations/${conversationRes.body._id}/messages`)
+    .send({ body: 'Chào host, phòng còn trống không?' })
+    .expect(201);
+  assert.equal(messageRes.body.body, 'Chào host, phòng còn trống không?');
+
+  await otherGuestAgent.get(`/api/conversations/${conversationRes.body._id}/messages`).expect(403);
+  const hostMessages = await hostAgent.get(`/api/conversations/${conversationRes.body._id}/messages`).expect(200);
+  assert.equal(hostMessages.body.length, 1);
+
+  await hostAgent
+    .post(`/api/conversations/${conversationRes.body._id}/messages`)
+    .send({ body: 'Chào bạn, phòng đang sẵn sàng.' })
+    .expect(201);
+
+  const guestInbox = await guestAgent.get('/api/conversations').expect(200);
+  assert.equal(guestInbox.body.length, 1);
+  assert.equal(guestInbox.body[0].unreadCount, 1);
+
+  await guestAgent.patch(`/api/conversations/${conversationRes.body._id}/read`).expect(200);
+  const afterRead = await guestAgent.get('/api/conversations').expect(200);
+  assert.equal(afterRead.body[0].unreadCount, 0);
 });
 
 after(async () => {
@@ -223,10 +320,23 @@ test('admin can inspect stats, manage roles, deactivate listings and cancel book
       guests: 1,
     })
     .expect(201);
+  const conversationRes = await guestAgent
+    .post('/api/conversations')
+    .send({ listing: listing._id.toString() })
+    .expect(201);
+  await guestAgent
+    .post(`/api/conversations/${conversationRes.body._id}/messages`)
+    .send({ body: 'Admin should be able to inspect this message.' })
+    .expect(201);
 
   const stats = await adminAgent.get('/api/admin/stats').expect(200);
   assert.equal(stats.body.users, 3);
   assert.equal(stats.body.bookings, 1);
+  assert.equal(stats.body.conversations, 1);
+  assert.equal(stats.body.messages, 1);
+
+  const adminMessages = await adminAgent.get('/api/admin/messages').expect(200);
+  assert.equal(adminMessages.body.length, 1);
 
   const roleRes = await adminAgent
     .patch(`/api/admin/users/${guest._id}/role`)

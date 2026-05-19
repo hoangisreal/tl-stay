@@ -7,6 +7,9 @@ import Listing from '../models/Listing.js';
 import Booking from '../models/Booking.js';
 import BookingHold from '../models/BookingHold.js';
 import Review from '../models/Review.js';
+import Conversation from '../models/Conversation.js';
+import Message from '../models/Message.js';
+import PasswordResetToken from '../models/PasswordResetToken.js';
 import { enumerateStayNights } from './availability.js';
 import { computeBreakdown } from './pricing.js';
 
@@ -18,6 +21,27 @@ const daysFromNow = (n) => {
 };
 
 const u = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1200&q=70`;
+
+const cityCoordinates = {
+  'Đà Nẵng': { lat: 16.0678, lng: 108.2208 },
+  'Nha Trang': { lat: 12.2388, lng: 109.1967 },
+  'Đà Lạt': { lat: 11.9404, lng: 108.4583 },
+  'Hội An': { lat: 15.8801, lng: 108.338 },
+  'Hồ Chí Minh': { lat: 10.7769, lng: 106.7009 },
+  'Hà Nội': { lat: 21.0285, lng: 105.8542 },
+  'Phú Quốc': { lat: 10.2899, lng: 103.984 },
+  'Hòa Bình': { lat: 20.6861, lng: 105.3131 },
+  'Sa Pa': { lat: 22.3364, lng: 103.8438 },
+  'Quy Nhơn': { lat: 13.782, lng: 109.219 },
+  'Mộc Châu': { lat: 20.8516, lng: 104.6894 },
+  'Ninh Bình': { lat: 20.2506, lng: 105.9745 },
+  'Huế': { lat: 16.4637, lng: 107.5909 },
+  'Cần Thơ': { lat: 10.0452, lng: 105.7469 },
+  'Vũng Tàu': { lat: 10.4114, lng: 107.1362 },
+  'Phan Thiết': { lat: 10.9804, lng: 108.2615 },
+  'Côn Đảo': { lat: 8.6956, lng: 106.6089 },
+  'Sơn La': { lat: 21.328, lng: 103.914 },
+};
 
 const demoUsers = [
   { key: 'admin', name: 'TL-Stay Admin', email: 'admin@tlstay.com', role: 'admin' },
@@ -547,6 +571,109 @@ const wishlistSpecs = {
   guestNam: ['Villa thông Đà Lạt', 'Nhà ven hồ Tràng An', 'Căn hộ biển Vũng Tàu'],
 };
 
+const conversationSpecs = [
+  {
+    listing: 'Căn hộ view biển Đà Nẵng',
+    guest: 'guestAn',
+    messages: [
+      ['guest', -6, 'Chào anh Minh, căn hộ có thể check-in sớm khoảng 12h không ạ?'],
+      ['host', -6, 'Chào An, hôm đó khách trước trả phòng sớm nên anh có thể hỗ trợ check-in lúc 12h30.'],
+      ['guest', -5, 'Dạ tốt quá. Khu gửi xe máy có thuận tiện không anh?'],
+      ['host', -5, 'Có hầm gửi xe trong tòa nhà, anh sẽ gửi hướng dẫn trước ngày nhận phòng.'],
+    ],
+  },
+  {
+    listing: 'Villa hồ bơi riêng',
+    guest: 'guestBinh',
+    messages: [
+      ['guest', -4, 'Villa có bếp BBQ và dụng cụ nướng cho nhóm 6 người không ạ?'],
+      ['host', -4, 'Có sẵn bếp than, vỉ nướng và bàn ngoài trời. Nếu cần hải sản anh có thể gợi ý chỗ mua.'],
+      ['guest', -3, 'Tụi em đi cùng trẻ nhỏ, hồ bơi sâu khoảng bao nhiêu?'],
+      ['host', -3, 'Hồ chia 2 khu, khu nông khoảng 0.8m và khu sâu 1.4m.'],
+    ],
+  },
+  {
+    listing: 'Homestay phố cổ Hội An',
+    guest: 'guestChi',
+    messages: [
+      ['guest', -9, 'Nhà mình có cách âm tốt không ạ? Em cần nghỉ ngơi sau chuyến bay.'],
+      ['host', -9, 'Nhà nằm trong hẻm nhỏ nên khá yên tĩnh, tối chỉ có tiếng phố đi bộ từ xa.'],
+      ['guest', -8, 'Em có thể gửi hành lý trước giờ check-in không?'],
+      ['host', -8, 'Được nhé, bạn có thể gửi từ 10h sáng tại quầy nhà chính.'],
+    ],
+  },
+  {
+    listing: 'Studio gần Hồ Tây',
+    guest: 'guestHa',
+    messages: [
+      ['guest', -7, 'Studio có bàn làm việc đủ rộng cho laptop và màn hình rời không anh?'],
+      ['host', -7, 'Bàn dài 1m2, có đèn và ổ cắm cạnh bàn. WiFi khoảng 80Mbps.'],
+      ['guest', -6, 'Vậy phù hợp rồi ạ, em sẽ đặt 3 đêm tuần sau.'],
+      ['host', -6, 'Cảm ơn Hà, mình sẽ giữ lịch và gửi hướng dẫn tự check-in.'],
+    ],
+  },
+  {
+    listing: 'Bungalow ven biển Phú Quốc',
+    guest: 'guestKhoa',
+    messages: [
+      ['guest', -10, 'Từ bungalow đi bộ ra biển mất bao lâu vậy chị?'],
+      ['host', -10, 'Khoảng 4 phút đi bộ qua lối riêng của khu nghỉ.'],
+      ['guest', -10, 'Khu này có thuê xe máy không chị?'],
+      ['host', -9, 'Có, lễ tân hỗ trợ thuê xe máy và xe điện theo ngày.'],
+    ],
+  },
+  {
+    listing: 'Cabin Sa Pa',
+    guest: 'guestNam',
+    messages: [
+      ['guest', -12, 'Cabin có sưởi không ạ? Em đi tháng này sợ lạnh.'],
+      ['host', -12, 'Có chăn điện và máy sưởi dầu. Buổi tối nhiệt độ khoảng 12-15 độ.'],
+      ['guest', -11, 'Đường vào cabin ô tô 7 chỗ tới được không?'],
+      ['host', -11, 'Ô tô tới bãi đỗ cách cabin 80m, tụi mình hỗ trợ kéo hành lý.'],
+    ],
+  },
+  {
+    listing: 'Nhà vườn An Bàng',
+    guest: 'guestAn',
+    messages: [
+      ['guest', -14, 'Nhà vườn có bếp đủ để nấu bữa tối gia đình không chị?'],
+      ['host', -14, 'Có bếp từ, nồi chảo, chén đĩa và tủ lạnh lớn.'],
+      ['guest', -13, 'Từ nhà ra biển đi bộ có an toàn buổi tối không ạ?'],
+      ['host', -13, 'Đường có đèn và nhiều homestay xung quanh, đi bộ khoảng 5 phút.'],
+    ],
+  },
+  {
+    listing: 'Farmstay Mộc Châu',
+    guest: 'guestLinh',
+    messages: [
+      ['guest', -3, 'Farmstay có nhận thú cưng nhỏ không ạ?'],
+      ['host', -3, 'Bên mình nhận thú cưng dưới 8kg, bạn báo trước để chuẩn bị thảm nằm nhé.'],
+      ['guest', -2, 'Có tour hái chè buổi sáng không chị?'],
+      ['host', -2, 'Có tour 7h30 mỗi ngày, mình sẽ đặt trước cho bạn nếu cần.'],
+    ],
+  },
+  {
+    listing: 'Căn hộ biển Vũng Tàu',
+    guest: 'guestKhoa',
+    messages: [
+      ['guest', -5, 'Căn hộ có thang máy và chỗ đậu ô tô không anh?'],
+      ['host', -5, 'Có 3 thang máy và hầm ô tô tính phí theo ngày của tòa nhà.'],
+      ['guest', -4, 'Bãi Sau đi bộ bao lâu ạ?'],
+      ['host', -4, 'Khoảng 6 phút đi bộ, cuối tuần nên đi sớm để đỡ đông.'],
+    ],
+  },
+  {
+    listing: 'Penthouse view sông Hàn',
+    guest: 'guestKhoa',
+    messages: [
+      ['guest', -2, 'Penthouse có giới hạn giờ dùng sân thượng không anh?'],
+      ['host', -2, 'Sân thượng dùng đến 22h để tránh ảnh hưởng căn bên cạnh.'],
+      ['guest', -1, 'Nhóm em 6 người, có thêm nệm phụ được không?'],
+      ['host', -1, 'Có thể thêm 1 nệm phụ, anh sẽ chuẩn bị trước ngày check-in.'],
+    ],
+  },
+];
+
 const makeRatingDetail = (rating, offset) => Math.max(1, Math.min(5, rating - (offset ? 1 : 0)));
 
 export const seedDemoData = async ({ reset = true, log = true } = {}) => {
@@ -557,6 +684,9 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
       Booking.deleteMany({}),
       BookingHold.deleteMany({}),
       Review.deleteMany({}),
+      Conversation.deleteMany({}),
+      Message.deleteMany({}),
+      PasswordResetToken.deleteMany({}),
     ]);
   }
 
@@ -568,6 +698,10 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
     demoListings.map(({ host, ...listing }) => ({
       ...listing,
       host: userByKey[host]._id,
+      location: {
+        ...listing.location,
+        ...(cityCoordinates[listing.location.city] || {}),
+      },
       isActive: listing.isActive ?? true,
     }))
   );
@@ -647,6 +781,34 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
     )
   );
 
+  const conversations = await Conversation.insertMany(
+    conversationSpecs.map((spec) => {
+      const listing = findListing(spec.listing);
+      return {
+        listing: listing._id,
+        host: listing.host,
+        guest: userByKey[spec.guest]._id,
+        lastMessageAt: daysFromNow(spec.messages.at(-1)[1]),
+      };
+    })
+  );
+  const conversationMessages = conversationSpecs.flatMap((spec, conversationIndex) => {
+    const conversation = conversations[conversationIndex];
+    return spec.messages.map(([sender, dayOffset, body], messageIndex) => {
+      const createdAt = daysFromNow(dayOffset);
+      createdAt.setUTCHours(9 + messageIndex * 2, 15, 0, 0);
+      return {
+        conversation: conversation._id,
+        sender: sender === 'host' ? conversation.host : conversation.guest,
+        body,
+        readAt: messageIndex < 2 ? daysFromNow(dayOffset + 1) : null,
+        createdAt,
+        updatedAt: createdAt,
+      };
+    });
+  });
+  if (conversationMessages.length) await Message.insertMany(conversationMessages);
+
   if (log) {
     console.log('Seed completed.');
     console.log(`  Users:    ${await User.countDocuments()}`);
@@ -654,6 +816,7 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
     console.log(`  Active:   ${await Listing.countDocuments({ isActive: true })}`);
     console.log(`  Bookings: ${await Booking.countDocuments()}`);
     console.log(`  Reviews:  ${await Review.countDocuments()}`);
+    console.log(`  Chats:    ${await Conversation.countDocuments()} conversations, ${await Message.countDocuments()} messages`);
     console.log('');
     console.log('Demo accounts (password: password123):');
     console.log('  Admin: admin@tlstay.com');

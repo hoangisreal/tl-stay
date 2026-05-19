@@ -52,6 +52,8 @@ const listingSchema = z.object({
   city: z.string().min(2),
   address: z.string().min(5),
   country: z.string().optional(),
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
   amenities: z.string().optional(),
   category: z.enum(CATEGORIES).optional(),
 });
@@ -100,7 +102,7 @@ export const create = async (req, res, next) => {
       await removeImageFiles(images);
       return next(new Error(parsed.error.errors[0].message));
     }
-    const { city, address, country, amenities, ...rest } = parsed.data;
+    const { city, address, country, lat, lng, amenities, ...rest } = parsed.data;
     let amenitiesList;
     try {
       amenitiesList = parseAmenities(amenities);
@@ -111,7 +113,7 @@ export const create = async (req, res, next) => {
     const listing = await Listing.create({
       ...rest,
       host: req.user._id,
-      location: { city, address, country: country || 'Việt Nam' },
+      location: { city, address, country: country || 'Việt Nam', lat, lng },
       amenities: amenitiesList,
       images,
     });
@@ -191,14 +193,16 @@ export const update = async (req, res, next) => {
       await removeImageFiles(newImages);
       return next(new Error(parsed.error.errors[0].message));
     }
-    const { city, address, country, amenities, ...rest } = parsed.data;
+    const { city, address, country, lat, lng, amenities, ...rest } = parsed.data;
     const updateData = { ...rest };
-    if (city || address || country) {
+    if (city || address || country || lat !== undefined || lng !== undefined) {
       updateData.location = {
         ...req.listing.location.toObject(),
         ...(city && { city }),
         ...(address && { address }),
         ...(country && { country }),
+        ...(lat !== undefined && { lat }),
+        ...(lng !== undefined && { lng }),
       };
     }
     if (amenities !== undefined) {

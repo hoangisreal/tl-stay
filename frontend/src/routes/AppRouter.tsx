@@ -14,6 +14,11 @@ import WishlistPage from '../pages/WishlistPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 import ErrorPage from '../pages/ErrorPage.tsx';
 import AdminPanelPage from '../pages/AdminPanelPage.tsx';
+import ForgotPasswordPage from '../pages/ForgotPasswordPage.tsx';
+import ResetPasswordPage from '../pages/ResetPasswordPage.tsx';
+import ChangePasswordPage from '../pages/ChangePasswordPage.tsx';
+import MessagesPage from '../pages/MessagesPage.tsx';
+import ConversationPage from '../pages/ConversationPage.tsx';
 
 export default function AppRouter() {
   return (
@@ -35,6 +40,30 @@ export default function AppRouter() {
             element={
               <ProtectedRoute>
                 <WishlistPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <MessagesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages/:id"
+            element={
+              <ProtectedRoute>
+                <ConversationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePasswordPage />
               </ProtectedRoute>
             }
           />
@@ -73,6 +102,8 @@ export default function AppRouter() {
         </Route>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/error" element={<ErrorPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
