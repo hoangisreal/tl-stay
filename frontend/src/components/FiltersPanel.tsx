@@ -24,15 +24,15 @@ export default function FiltersPanel() {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+      <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 w-full sm:w-auto">
         <span className="text-xs text-gray-500">Giá từ</span>
         <input
           type="number"
           placeholder="0"
           value={minPrice}
           onChange={(e) => setMinPrice(e.target.value)}
-          className="w-24 text-sm outline-none"
+          className="w-full sm:w-24 text-sm outline-none"
         />
         <span className="text-xs text-gray-500">–</span>
         <input
@@ -40,13 +40,13 @@ export default function FiltersPanel() {
           placeholder="Không giới hạn"
           value={maxPrice}
           onChange={(e) => setMaxPrice(e.target.value)}
-          className="w-28 text-sm outline-none"
+          className="w-full sm:w-28 text-sm outline-none"
         />
         <span className="text-xs text-gray-500">đ</span>
       </div>
       <button
         onClick={applyFilters}
-        className="bg-gray-800 text-white text-sm px-4 py-2 rounded-xl hover:bg-gray-700 transition-colors"
+        className="w-full sm:w-auto bg-gray-800 text-white text-sm px-4 py-2 rounded-xl hover:bg-gray-700 transition-colors"
       >
         Lọc
       </button>

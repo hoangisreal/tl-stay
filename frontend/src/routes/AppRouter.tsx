@@ -13,6 +13,7 @@ import BookingConfirmationPage from '../pages/BookingConfirmationPage.tsx';
 import WishlistPage from '../pages/WishlistPage.tsx';
 import NotFoundPage from '../pages/NotFoundPage.tsx';
 import ErrorPage from '../pages/ErrorPage.tsx';
+import AdminPanelPage from '../pages/AdminPanelPage.tsx';
 
 export default function AppRouter() {
   return (
@@ -50,6 +51,14 @@ export default function AppRouter() {
             element={
               <RoleRoute role="host">
                 <HostBookingsPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RoleRoute role="admin">
+                <AdminPanelPage />
               </RoleRoute>
             }
           />

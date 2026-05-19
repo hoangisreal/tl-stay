@@ -4,7 +4,7 @@ export interface AuthUser {
   _id: string;
   name: string;
   email: string;
-  role: 'guest' | 'host';
+  role: 'guest' | 'host' | 'admin';
   avatarUrl: string;
   favoriteListings?: string[];
 }

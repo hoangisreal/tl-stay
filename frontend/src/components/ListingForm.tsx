@@ -8,17 +8,29 @@ import FormError from './FormError.tsx';
 import AmenityPicker from './AmenityPicker.tsx';
 import ImageUploader from './ImageUploader.tsx';
 import { resolveImageUrl } from '../lib/images.ts';
+import { CATEGORIES } from '../lib/categories.ts';
+
+const optionalNumber = z.preprocess(
+  (value) => (typeof value === 'number' && Number.isNaN(value) ? undefined : value),
+  z.number().int().min(1).optional()
+);
 
 const listingSchema = z.object({
   title: z.string().min(3, 'Tiêu đề phải có ít nhất 3 ký tự'),
   description: z.string().min(10, 'Mô tả phải có ít nhất 10 ký tự'),
   pricePerNight: z.number().positive('Giá phải lớn hơn 0'),
+  cleaningFee: z.preprocess(
+    (value) => (typeof value === 'number' && Number.isNaN(value) ? undefined : value),
+    z.number().min(0).optional()
+  ),
   maxGuests: z.number().int().min(1, 'Ít nhất 1 khách'),
-  bedrooms: z.number().int().min(1).optional(),
-  beds: z.number().int().min(1).optional(),
-  bathrooms: z.number().int().min(1).optional(),
+  bedrooms: optionalNumber,
+  beds: optionalNumber,
+  bathrooms: optionalNumber,
   city: z.string().min(2, 'Vui lòng nhập thành phố'),
   address: z.string().min(5, 'Vui lòng nhập địa chỉ'),
+  country: z.string().optional(),
+  category: z.string().optional(),
 });
 
 type ListingFormData = z.infer<typeof listingSchema>;
@@ -45,14 +57,17 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
           title: listing.title,
           description: listing.description,
           pricePerNight: listing.pricePerNight,
+          cleaningFee: listing.cleaningFee,
           maxGuests: listing.maxGuests,
           bedrooms: listing.bedrooms,
           beds: listing.beds,
           bathrooms: listing.bathrooms,
           city: listing.location.city,
           address: listing.location.address,
+          country: listing.location.country,
+          category: listing.category,
         }
-      : {},
+      : { category: 'city', country: 'Việt Nam' },
   });
 
   const handleFormSubmit = async (data: ListingFormData) => {
@@ -90,15 +105,31 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
         />
         {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField id="pricePerNight" label="Giá / đêm (VNĐ)" type="number" error={errors.pricePerNight} {...register('pricePerNight', { valueAsNumber: true })} />
+        <FormField id="cleaningFee" label="Phí dọn dẹp (VNĐ)" type="number" error={errors.cleaningFee} {...register('cleaningFee', { valueAsNumber: true })} />
         <FormField id="maxGuests" label="Số khách tối đa" type="number" error={errors.maxGuests} {...register('maxGuests', { valueAsNumber: true })} />
         <FormField id="bedrooms" label="Phòng ngủ" type="number" error={errors.bedrooms} {...register('bedrooms', { valueAsNumber: true })} />
         <FormField id="beds" label="Giường" type="number" error={errors.beds} {...register('beds', { valueAsNumber: true })} />
         <FormField id="bathrooms" label="Phòng tắm" type="number" error={errors.bathrooms} {...register('bathrooms', { valueAsNumber: true })} />
       </div>
-      <FormField id="city" label="Thành phố" error={errors.city} {...register('city')} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <FormField id="city" label="Thành phố" error={errors.city} {...register('city')} />
+        <FormField id="country" label="Quốc gia" error={errors.country} {...register('country')} />
+      </div>
       <FormField id="address" label="Địa chỉ" error={errors.address} {...register('address')} />
+      <div className="flex flex-col gap-1">
+        <label htmlFor="category" className="text-sm font-medium text-gray-700">Loại phòng</label>
+        <select
+          id="category"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-rose-400"
+          {...register('category')}
+        >
+          {CATEGORIES.map((category) => (
+            <option key={category.key} value={category.key}>{category.label}</option>
+          ))}
+        </select>
+      </div>
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-gray-700">Tiện ích</span>
         <AmenityPicker selected={amenities} onChange={setAmenities} />

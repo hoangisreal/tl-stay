@@ -44,12 +44,12 @@ export default function ListingDetailsPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 mb-2">{listing.title}</h1>
           <p className="text-sm text-gray-500">{listing.location.address}, {listing.location.city}, {listing.location.country}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between sm:justify-end gap-4">
           <div className="flex items-center gap-2">
             <RatingStars value={listing.avgRating || 0} size="sm" readOnly />
             <span className="text-sm text-gray-600">({listing.reviewCount || 0} đánh giá)</span>
@@ -62,7 +62,7 @@ export default function ListingDetailsPage() {
         <img
           src={images[0]}
           alt={listing.title}
-          className="w-full h-80 object-cover rounded-2xl cursor-pointer"
+          className="w-full h-64 sm:h-80 object-cover rounded-2xl cursor-pointer"
           onClick={() => openLightbox(0)}
         />
         {images.length > 1 && (
@@ -91,7 +91,7 @@ export default function ListingDetailsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+          <div className="flex items-center justify-between gap-4 pb-4 border-b border-gray-200">
             <div>
               <p className="font-semibold text-gray-800">
                 {listing.bedrooms} phòng ngủ · {listing.beds} giường · {listing.bathrooms} phòng tắm · tối đa {listing.maxGuests} khách

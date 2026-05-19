@@ -7,6 +7,7 @@ import Booking from '../models/Booking.js';
 import BookingHold from '../models/BookingHold.js';
 import Review from '../models/Review.js';
 import { getBookedRanges } from '../utils/availability.js';
+import { dateOnlySchema, objectIdSchema, parseDateOnly } from '../utils/validators.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +38,7 @@ const parseAmenities = (value) => {
 };
 
 const CATEGORIES = ['beach', 'mountain', 'city', 'cabin', 'countryside', 'lakeside', 'tropical', 'pool', 'design'];
+const SORT_OPTIONS = ['-createdAt', 'createdAt', 'pricePerNight', '-pricePerNight', 'avgRating', '-avgRating'];
 
 const listingSchema = z.object({
   title: z.string().min(3),
@@ -53,6 +55,41 @@ const listingSchema = z.object({
   amenities: z.string().optional(),
   category: z.enum(CATEGORIES).optional(),
 });
+
+const listingQuerySchema = z
+  .object({
+    location: z.string().trim().min(1).max(80).optional(),
+    minPrice: z.coerce.number().min(0).optional(),
+    maxPrice: z.coerce.number().min(0).optional(),
+    guests: z.coerce.number().int().min(1).optional(),
+    category: z.enum(CATEGORIES).optional(),
+    checkIn: dateOnlySchema.optional(),
+    checkOut: dateOnlySchema.optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(50).default(12),
+    sort: z.enum(SORT_OPTIONS).default('-createdAt'),
+  })
+  .superRefine((data, ctx) => {
+    if ((data.checkIn && !data.checkOut) || (!data.checkIn && data.checkOut)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'checkIn and checkOut must be provided together' });
+    }
+    if (data.checkIn && data.checkOut) {
+      const checkInDate = parseDateOnly(data.checkIn);
+      const checkOutDate = parseDateOnly(data.checkOut);
+      if (!checkInDate || !checkOutDate || checkInDate >= checkOutDate) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid date range' });
+      }
+    }
+    if (data.minPrice !== undefined && data.maxPrice !== undefined && data.minPrice > data.maxPrice) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'minPrice cannot exceed maxPrice' });
+    }
+  });
+
+const paramsSchema = z.object({
+  id: objectIdSchema,
+});
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export const create = async (req, res, next) => {
   const images = uploadedImagePaths(req.files);
@@ -87,38 +124,41 @@ export const create = async (req, res, next) => {
 
 export const getAll = async (req, res, next) => {
   try {
-    const { location, minPrice, maxPrice, guests, category, checkIn, checkOut, page = 1, limit = 12, sort = '-createdAt' } = req.query;
+    const parsed = listingQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const { location, minPrice, maxPrice, guests, category, checkIn, checkOut, page, limit, sort } = parsed.data;
     const filter = { isActive: true };
 
-    if (location) filter['location.city'] = { $regex: location, $options: 'i' };
-    if (category && CATEGORIES.includes(category)) filter.category = category;
-    if (minPrice || maxPrice) {
+    if (location) filter['location.city'] = { $regex: escapeRegExp(location), $options: 'i' };
+    if (category) filter.category = category;
+    if (minPrice !== undefined || maxPrice !== undefined) {
       filter.pricePerNight = {};
-      if (minPrice) filter.pricePerNight.$gte = Number(minPrice);
-      if (maxPrice) filter.pricePerNight.$lte = Number(maxPrice);
+      if (minPrice !== undefined) filter.pricePerNight.$gte = minPrice;
+      if (maxPrice !== undefined) filter.pricePerNight.$lte = maxPrice;
     }
-    if (guests) filter.maxGuests = { $gte: Number(guests) };
+    if (guests) filter.maxGuests = { $gte: guests };
     if (checkIn && checkOut) {
       const bookedIds = await Booking.distinct('listing', {
         status: { $ne: 'cancelled' },
-        checkIn: { $lt: new Date(checkOut) },
-        checkOut: { $gt: new Date(checkIn) },
+        checkIn: { $lt: parseDateOnly(checkOut) },
+        checkOut: { $gt: parseDateOnly(checkIn) },
       });
       filter._id = { $nin: bookedIds };
     }
 
-    const pageNum = Math.max(1, Number(page));
-    const limitNum = Math.min(50, Math.max(1, Number(limit)));
     const [listings, total] = await Promise.all([
       Listing.find(filter)
         .populate('host', 'name avatarUrl')
         .sort(sort)
-        .skip((pageNum - 1) * limitNum)
-        .limit(limitNum),
+        .skip((page - 1) * limit)
+        .limit(limit),
       Listing.countDocuments(filter),
     ]);
 
-    res.json({ listings, page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) });
+    res.json({ listings, page, limit, total, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }
@@ -126,7 +166,12 @@ export const getAll = async (req, res, next) => {
 
 export const getById = async (req, res, next) => {
   try {
-    const listing = await Listing.findOne({ _id: req.params.id, isActive: true }).populate('host', 'name avatarUrl');
+    const parsed = paramsSchema.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const listing = await Listing.findOne({ _id: parsed.data.id, isActive: true }).populate('host', 'name avatarUrl');
     if (!listing) {
       res.status(404);
       return next(new Error('Listing not found'));
@@ -216,7 +261,17 @@ export const getByHost = async (req, res, next) => {
 
 export const getAvailability = async (req, res, next) => {
   try {
-    const ranges = await getBookedRanges(req.params.id);
+    const parsed = paramsSchema.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const listing = await Listing.findOne({ _id: parsed.data.id, isActive: true }).select('_id');
+    if (!listing) {
+      res.status(404);
+      return next(new Error('Listing not found'));
+    }
+    const ranges = await getBookedRanges(parsed.data.id);
     res.json(ranges);
   } catch (err) {
     next(err);

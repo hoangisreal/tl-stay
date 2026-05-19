@@ -3,7 +3,11 @@ const TAX_RATE = 0.08;
 
 export const countNights = (checkIn, checkOut) => {
   const msPerDay = 1000 * 60 * 60 * 24;
-  return Math.round((new Date(checkOut) - new Date(checkIn)) / msPerDay);
+  const start = new Date(checkIn);
+  const end = new Date(checkOut);
+  const startUtc = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const endUtc = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  return Math.round((endUtc - startUtc) / msPerDay);
 };
 
 export const computeBreakdown = (checkIn, checkOut, pricePerNight, cleaningFee = 0) => {

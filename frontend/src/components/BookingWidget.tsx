@@ -74,7 +74,7 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
   };
 
   return (
-    <div className="border border-gray-200 rounded-2xl p-6 shadow-md sticky top-24">
+    <div className="border border-gray-200 rounded-2xl p-4 sm:p-6 shadow-md lg:sticky lg:top-24">
       <p className="text-xl font-bold text-gray-800 mb-4">
         {listing.pricePerNight.toLocaleString('vi-VN')}đ
         <span className="text-sm font-normal text-gray-500"> / đêm</span>

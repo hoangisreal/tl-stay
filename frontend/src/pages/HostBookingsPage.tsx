@@ -35,8 +35,8 @@ export default function HostBookingsPage() {
             const checkIn = new Date(booking.checkIn).toLocaleDateString('vi-VN');
             const checkOut = new Date(booking.checkOut).toLocaleDateString('vi-VN');
             return (
-              <div key={booking._id} className="flex gap-4 bg-white border border-gray-200 rounded-2xl p-4">
-                <img src={img} alt={booking.listing.title} className="w-28 h-20 object-cover rounded-xl shrink-0" />
+              <div key={booking._id} className="flex flex-col sm:flex-row gap-4 bg-white border border-gray-200 rounded-2xl p-4">
+                <img src={img} alt={booking.listing.title} className="w-full sm:w-28 h-44 sm:h-20 object-cover rounded-xl shrink-0" />
                 <div className="flex-1 min-w-0 space-y-1">
                   <Link to={`/listings/${booking.listing._id}`} className="font-semibold text-gray-800 hover:text-rose-500 truncate block">
                     {booking.listing.title}

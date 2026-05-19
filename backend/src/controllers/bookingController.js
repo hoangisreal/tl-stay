@@ -4,12 +4,23 @@ import BookingHold from '../models/BookingHold.js';
 import Listing from '../models/Listing.js';
 import { enumerateStayNights, hasOverlap } from '../utils/availability.js';
 import { computeBreakdown } from '../utils/pricing.js';
+import { dateOnlySchema, objectIdSchema, parseDateOnly, todayUtcDateOnly } from '../utils/validators.js';
 
 const bookingSchema = z.object({
-  listing: z.string(),
-  checkIn: z.string(),
-  checkOut: z.string(),
+  listing: objectIdSchema,
+  checkIn: dateOnlySchema,
+  checkOut: dateOnlySchema,
   guests: z.coerce.number().int().min(1),
+});
+
+const quoteSchema = z.object({
+  listing: objectIdSchema,
+  checkIn: dateOnlySchema,
+  checkOut: dateOnlySchema,
+});
+
+const paramsSchema = z.object({
+  id: objectIdSchema,
 });
 
 const isDuplicateHoldError = (err) =>
@@ -23,10 +34,10 @@ export const create = async (req, res, next) => {
       return next(new Error(parsed.error.errors[0].message));
     }
     const { listing: listingId, checkIn, checkOut, guests } = parsed.data;
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
+    const checkInDate = parseDateOnly(checkIn);
+    const checkOutDate = parseDateOnly(checkOut);
 
-    if (Number.isNaN(checkInDate.getTime()) || Number.isNaN(checkOutDate.getTime())) {
+    if (!checkInDate || !checkOutDate) {
       res.status(400);
       return next(new Error('Invalid date format'));
     }
@@ -34,8 +45,7 @@ export const create = async (req, res, next) => {
       res.status(400);
       return next(new Error('Check-out must be after check-in'));
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = todayUtcDateOnly();
     if (checkInDate < today) {
       res.status(400);
       return next(new Error('Check-in cannot be in the past'));
@@ -143,7 +153,12 @@ export const getHostBookings = async (req, res, next) => {
 
 export const cancel = async (req, res, next) => {
   try {
-    const booking = await Booking.findById(req.params.id);
+    const parsed = paramsSchema.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const booking = await Booking.findById(parsed.data.id);
     if (!booking) {
       res.status(404);
       return next(new Error('Booking not found'));
@@ -170,11 +185,12 @@ export const cancel = async (req, res, next) => {
 
 export const quote = async (req, res, next) => {
   try {
-    const { listing: listingId, checkIn, checkOut } = req.query;
-    if (!listingId || !checkIn || !checkOut) {
+    const parsed = quoteSchema.safeParse(req.query);
+    if (!parsed.success) {
       res.status(400);
-      return next(new Error('listing, checkIn and checkOut are required'));
+      return next(new Error(parsed.error.errors[0].message));
     }
+    const { listing: listingId, checkIn, checkOut } = parsed.data;
     const listing = await Listing.findById(listingId).select('pricePerNight cleaningFee isActive');
     if (!listing) {
       res.status(404);
@@ -184,9 +200,9 @@ export const quote = async (req, res, next) => {
       res.status(400);
       return next(new Error('Listing is not available'));
     }
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-    if (Number.isNaN(checkInDate.getTime()) || Number.isNaN(checkOutDate.getTime())) {
+    const checkInDate = parseDateOnly(checkIn);
+    const checkOutDate = parseDateOnly(checkOut);
+    if (!checkInDate || !checkOutDate) {
       res.status(400);
       return next(new Error('Invalid date format'));
     }
@@ -203,7 +219,12 @@ export const quote = async (req, res, next) => {
 
 export const getById = async (req, res, next) => {
   try {
-    const booking = await Booking.findById(req.params.id)
+    const parsed = paramsSchema.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const booking = await Booking.findById(parsed.data.id)
       .populate('listing', 'title images location pricePerNight')
       .populate('guest', 'name email');
     if (!booking) {

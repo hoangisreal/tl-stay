@@ -36,6 +36,13 @@ const registerAgent = async (email, role = 'guest') => {
   return { agent, user };
 };
 
+const registerAdminAgent = async (email) => {
+  const { agent, user } = await registerAgent(email, 'guest');
+  user.role = 'admin';
+  await user.save();
+  return { agent, user };
+};
+
 const createListing = (host, overrides = {}) =>
   Listing.create({
     host: host._id,
@@ -173,4 +180,69 @@ test('deleting a listing with booking history deactivates it and preserves histo
   await request(app).get(`/api/listings/${listing._id}`).expect(404);
   const hostListings = await hostAgent.get('/api/listings/host/me').expect(200);
   assert.equal(hostListings.body.length, 0);
+});
+
+test('invalid ids and listing filters return 400 instead of server errors', async () => {
+  const { agent: guestAgent } = await registerAgent('guest@example.com');
+
+  await guestAgent.get('/api/bookings/not-an-id').expect(400);
+  await request(app).get('/api/listings').query({ sort: 'host' }).expect(400);
+  await request(app)
+    .get('/api/listings')
+    .query({ checkIn: dateFromNow(10) })
+    .expect(400);
+});
+
+test('wishlist only exposes active listings', async () => {
+  const { user: host } = await registerAgent('host@example.com', 'host');
+  const { agent: guestAgent, user: guest } = await registerAgent('guest@example.com');
+  const activeListing = await createListing(host, { title: 'Active stay' });
+  const inactiveListing = await createListing(host, { title: 'Inactive stay', isActive: false });
+
+  guest.favoriteListings.push(activeListing._id, inactiveListing._id);
+  await guest.save();
+
+  const wishlist = await guestAgent.get('/api/wishlist').expect(200);
+  assert.deepEqual(wishlist.body.map((l) => l._id), [activeListing._id.toString()]);
+
+  await guestAgent.post(`/api/wishlist/${inactiveListing._id}/toggle`).expect(404);
+});
+
+test('admin can inspect stats, manage roles, deactivate listings and cancel bookings', async () => {
+  const { agent: adminAgent } = await registerAdminAgent('admin@example.com');
+  const { user: host } = await registerAgent('host@example.com', 'host');
+  const { agent: guestAgent, user: guest } = await registerAgent('guest@example.com');
+  const listing = await createListing(host);
+
+  const bookingRes = await guestAgent
+    .post('/api/bookings')
+    .send({
+      listing: listing._id.toString(),
+      checkIn: dateFromNow(40),
+      checkOut: dateFromNow(42),
+      guests: 1,
+    })
+    .expect(201);
+
+  const stats = await adminAgent.get('/api/admin/stats').expect(200);
+  assert.equal(stats.body.users, 3);
+  assert.equal(stats.body.bookings, 1);
+
+  const roleRes = await adminAgent
+    .patch(`/api/admin/users/${guest._id}/role`)
+    .send({ role: 'host' })
+    .expect(200);
+  assert.equal(roleRes.body.role, 'host');
+
+  const listingRes = await adminAgent
+    .patch(`/api/admin/listings/${listing._id}/status`)
+    .send({ isActive: false })
+    .expect(200);
+  assert.equal(listingRes.body.isActive, false);
+
+  const cancelRes = await adminAgent
+    .patch(`/api/admin/bookings/${bookingRes.body._id}/cancel`)
+    .expect(200);
+  assert.equal(cancelRes.body.status, 'cancelled');
+  assert.equal(await BookingHold.countDocuments({ booking: bookingRes.body._id }), 0);
 });

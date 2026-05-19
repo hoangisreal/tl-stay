@@ -1,11 +1,20 @@
 import jwt from 'jsonwebtoken';
 
+const getJwtSecret = () => {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET is not set');
+  }
+  console.warn('JWT_SECRET is not set. Using a development-only fallback secret.');
+  return 'tl-stay-dev-secret';
+};
+
 export const signToken = (payload) =>
-  jwt.sign(payload, process.env.JWT_SECRET, {
+  jwt.sign(payload, getJwtSecret(), {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
 
-export const verifyToken = (token) => jwt.verify(token, process.env.JWT_SECRET);
+export const verifyToken = (token) => jwt.verify(token, getJwtSecret());
 
 const cookieOptions = {
   httpOnly: true,

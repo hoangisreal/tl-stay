@@ -15,9 +15,17 @@ export default function Navbar() {
           {!loading && (
             user ? (
               <>
-                <Link to="/wishlist" className="text-sm font-medium text-gray-700 hover:text-gray-900 flex items-center gap-1">
-                  <span>❤️</span> Yêu thích
-                </Link>
+                {user.role === 'guest' && (
+                  <Link to="/wishlist" className="text-sm font-medium text-gray-700 hover:text-gray-900 flex items-center gap-1">
+                    <span aria-hidden="true">♥</span>
+                    <span className="hidden sm:inline">Yêu thích</span>
+                  </Link>
+                )}
+                {user.role === 'admin' && (
+                  <Link to="/admin" className="text-sm font-medium text-gray-700 hover:text-gray-900">
+                    Admin
+                  </Link>
+                )}
                 <AccountMenu />
               </>
             ) : (

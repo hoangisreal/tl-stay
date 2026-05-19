@@ -13,7 +13,7 @@ Homestay booking platform (Airbnb-style) — Academic Project.
 
 ### Frontend
 - React 19 + TypeScript
-- Vite 8
+- Vite 6
 - Tailwind CSS v4
 - Zustand (State management)
 - React Router v6
@@ -52,30 +52,70 @@ tl-stay/
 
 ## Installation
 
-### 1. Clone and install dependencies
+### 1. Requirements
+
+- Node.js 20+
+- npm 10+
+- MongoDB is optional for local demo mode. Without `MONGO_URI`, the backend uses an
+  in-memory MongoDB database and seeds demo data automatically.
+
+### 2. NixOS / Nix development shell
+
+On NixOS, enter the dev shell before installing dependencies. The flake provides
+Node.js 22, npm, MongoDB, mongosh, and configures `mongodb-memory-server` to use
+the Nix-provided `mongod` binary.
 
 ```bash
-# Backend
-cd backend
-npm install
-
-# Frontend
-cd ../frontend
-npm install
+nix develop
+npm run install:all
+npm run doctor
+npm run dev
 ```
 
-### 2. Environment configuration
+If you use `direnv`, run this once:
 
-Create `.env` files:
+```bash
+direnv allow
+```
+
+### 3. Clone and install dependencies
+
+```bash
+npm run install:all
+npm run doctor
+```
+
+### 4. Environment configuration
+
+For a quick local demo, `.env` files are optional. If `backend/.env` does not define
+`MONGO_URI`, the backend starts with an in-memory MongoDB database and seeds demo data
+automatically when the database is empty.
+
+For persistent local data, copy the example files and edit them:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+On Windows PowerShell, the same commands work as:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
+```
 
 **backend/.env**
 ```env
 PORT=5000
-MONGO_URI=mongodb://localhost:27017/tl-stay
+# Leave MONGO_URI commented for zero-setup demo mode.
+# Uncomment only if you have a local MongoDB server running.
+# MONGO_URI=mongodb://localhost:27017/tl-stay
 JWT_SECRET=your_secret_key_here
 JWT_EXPIRES_IN=7d
-CLIENT_ORIGIN=http://localhost:5173
+CLIENT_ORIGIN=http://localhost:5173,http://127.0.0.1:5173
 NODE_ENV=development
+SEED_DEMO_ON_EMPTY=true
 ```
 
 **frontend/.env**
@@ -83,18 +123,40 @@ NODE_ENV=development
 VITE_API_URL=http://localhost:5000/api
 ```
 
-### 3. Seed demo data (optional)
+### 5. Seed demo data (optional)
+
+In development, TL-Stay seeds demo data automatically when the database is
+empty. Run the seed command manually when you want to reset the local demo
+database.
 
 ```bash
 cd backend
 npm run seed
 ```
 
-Demo accounts after seed:
-- **Host:** host@tlstay.com / password123
-- **Guest:** guest@tlstay.com / password123
+Demo dataset after seed:
+- 14 users: 1 admin, 5 hosts, 8 guests
+- 26 listings across Vietnam, including 24 active listings and 2 inactive
+  listings for Admin Panel moderation
+- 49 bookings with confirmed, pending, cancelled, past, and future scenarios
+- 24 reviews plus guest wishlists for client-side and admin demos
 
-### 4. Run the application
+Demo accounts (password: `password123`):
+- **Admin:** admin@tlstay.com / password123
+- **Host:** host@tlstay.com / password123
+- **Host:** mai.host@tlstay.com / password123
+- **Guest:** guest@tlstay.com / password123
+- **Guest:** binh.guest@tlstay.com / password123
+
+### 6. Run the application
+
+Run both backend and frontend from the project root:
+
+```bash
+npm run dev
+```
+
+Or run them in two terminals:
 
 ```bash
 # Terminal 1 - Backend
@@ -108,6 +170,13 @@ npm run dev
 
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:5000/api
+
+Quick health check:
+
+```bash
+curl http://localhost:5000/api/health
+curl http://localhost:5000/api/listings
+```
 
 ## Features
 
@@ -187,11 +256,22 @@ npm run dev
 - `GET /api/wishlist` - Get user's wishlist
 - `POST /api/wishlist/:listingId/toggle` - Toggle favorite
 
+### Admin
+- `GET /api/admin/stats` - Dashboard statistics
+- `GET /api/admin/users` - Manage users
+- `PATCH /api/admin/users/:id/role` - Update user role
+- `GET /api/admin/listings` - Manage listings
+- `PATCH /api/admin/listings/:id/status` - Show/hide listing
+- `GET /api/admin/bookings` - Manage bookings
+- `PATCH /api/admin/bookings/:id/cancel` - Cancel booking
+- `GET /api/admin/reviews` - Manage reviews
+- `DELETE /api/admin/reviews/:id` - Delete review
+
 ## Database Models
 
 ### User
 - name, email, passwordHash
-- role (guest/host)
+- role (guest/host/admin)
 - avatarUrl
 - favoriteListings (array of listing IDs)
 
@@ -222,6 +302,14 @@ npm run dev
 - comment
 
 ## Development Scripts
+
+### Root
+```bash
+npm run install:all # Install backend and frontend dependencies
+npm run doctor      # Check local setup prerequisites
+npm run dev         # Start backend and frontend together
+npm test            # Run backend tests and frontend build
+```
 
 ### Backend
 ```bash

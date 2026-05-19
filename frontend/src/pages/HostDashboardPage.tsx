@@ -49,11 +49,11 @@ export default function HostDashboardPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Quản lý phòng</h1>
         <button
           onClick={openCreate}
-          className="bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
+          className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
         >
           + Thêm phòng
         </button>
@@ -71,8 +71,8 @@ export default function HostDashboardPage() {
           {listings.map((listing) => {
             const img = resolveFirstImage(listing.images);
             return (
-              <div key={listing._id} className="flex gap-4 bg-white border border-gray-200 rounded-2xl p-4 items-center">
-                <img src={img} alt={listing.title} className="w-28 h-20 object-cover rounded-xl shrink-0" />
+              <div key={listing._id} className="flex flex-col sm:flex-row gap-4 bg-white border border-gray-200 rounded-2xl p-4 sm:items-center">
+                <img src={img} alt={listing.title} className="w-full sm:w-28 h-44 sm:h-20 object-cover rounded-xl shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-gray-800 truncate">{listing.title}</h3>
                   <p className="text-sm text-gray-500">{listing.location.city} · {listing.pricePerNight.toLocaleString('vi-VN')}đ/đêm · tối đa {listing.maxGuests} khách</p>

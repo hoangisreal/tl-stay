@@ -3,7 +3,7 @@ import useAuth from '../hooks/useAuth.ts';
 
 interface RoleRouteProps {
   children: React.ReactNode;
-  role: 'guest' | 'host';
+  role: 'guest' | 'host' | 'admin';
 }
 
 export default function RoleRoute({ children, role }: RoleRouteProps) {

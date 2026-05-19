@@ -2,9 +2,10 @@ import { z } from 'zod';
 import Review from '../models/Review.js';
 import Booking from '../models/Booking.js';
 import Listing from '../models/Listing.js';
+import { objectIdSchema } from '../utils/validators.js';
 
 const reviewSchema = z.object({
-  booking: z.string(),
+  booking: objectIdSchema,
   rating: z.coerce.number().int().min(1).max(5),
   cleanliness: z.coerce.number().int().min(1).max(5).optional(),
   accuracy: z.coerce.number().int().min(1).max(5).optional(),
@@ -13,6 +14,14 @@ const reviewSchema = z.object({
   location: z.coerce.number().int().min(1).max(5).optional(),
   value: z.coerce.number().int().min(1).max(5).optional(),
   comment: z.string().min(5).max(2000),
+});
+
+const reviewParamsSchema = z.object({
+  id: objectIdSchema,
+});
+
+const listingParamsSchema = z.object({
+  listingId: objectIdSchema,
 });
 
 const recomputeListingRating = async (listingId) => {
@@ -59,12 +68,21 @@ export const create = async (req, res, next) => {
       return next(new Error('You have already reviewed this booking'));
     }
 
-    const review = await Review.create({
-      ...data,
-      booking: bookingId,
-      listing: booking.listing,
-      guest: req.user._id,
-    });
+    let review;
+    try {
+      review = await Review.create({
+        ...data,
+        booking: bookingId,
+        listing: booking.listing,
+        guest: req.user._id,
+      });
+    } catch (err) {
+      if (err?.code === 11000) {
+        res.status(409);
+        return next(new Error('You have already reviewed this booking'));
+      }
+      throw err;
+    }
     await recomputeListingRating(booking.listing);
     const populated = await review.populate('guest', 'name avatarUrl');
     res.status(201).json(populated);
@@ -75,7 +93,17 @@ export const create = async (req, res, next) => {
 
 export const listByListing = async (req, res, next) => {
   try {
-    const reviews = await Review.find({ listing: req.params.listingId })
+    const parsed = listingParamsSchema.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const listing = await Listing.findOne({ _id: parsed.data.listingId, isActive: true }).select('_id');
+    if (!listing) {
+      res.status(404);
+      return next(new Error('Listing not found'));
+    }
+    const reviews = await Review.find({ listing: parsed.data.listingId })
       .populate('guest', 'name avatarUrl')
       .sort('-createdAt');
     res.json(reviews);
@@ -86,7 +114,12 @@ export const listByListing = async (req, res, next) => {
 
 export const remove = async (req, res, next) => {
   try {
-    const review = await Review.findById(req.params.id);
+    const parsed = reviewParamsSchema.safeParse(req.params);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const review = await Review.findById(parsed.data.id);
     if (!review) {
       res.status(404);
       return next(new Error('Review not found'));

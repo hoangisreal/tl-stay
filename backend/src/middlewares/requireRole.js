@@ -1,5 +1,6 @@
 const requireRole = (role) => (req, res, next) => {
-  if (req.user?.role !== role) {
+  const allowed = Array.isArray(role) ? role : [role];
+  if (!allowed.includes(req.user?.role)) {
     res.status(403);
     return next(new Error('Forbidden'));
   }
