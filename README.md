@@ -1,48 +1,48 @@
 # TL-Stay
 
-Homestay booking platform (Airbnb-style) — Academic Project.
+Nền tảng đặt phòng homestay.
 
-## Tech Stack
+## Công nghệ sử dụng
 
 ### Backend
 - Node.js, Express.js
 - MongoDB (Mongoose ODM)
 - JWT Authentication (httpOnly cookies)
-- Multer (File upload)
+- Multer (Tải lên file)
 - Zod (Validation)
 
 ### Frontend
 - React 19 + TypeScript
 - Vite 6
 - Tailwind CSS v4
-- Zustand (State management)
+- Zustand (Quản lý state)
 - React Router v6
-- React Hook Form + Zod (Form validation)
+- React Hook Form + Zod (Validation form)
 
-## Project Structure
+## Cấu trúc dự án
 
 ```
 tl-stay/
 ├── backend/
 │   ├── src/
-│   │   ├── config/       # Database configuration
-│   │   ├── controllers/  # Business logic
-│   │   ├── middlewares/  # Auth, error handling
-│   │   ├── models/       # Mongoose schemas
+│   │   ├── config/       # Cấu hình database
+│   │   ├── controllers/  # Logic nghiệp vụ
+│   │   ├── middlewares/  # Auth, xử lý lỗi
+│   │   ├── models/       # Schema Mongoose
 │   │   ├── routes/       # API routes
-│   │   ├── utils/        # Helpers (pricing, availability, upload, JWT)
-│   │   ├── app.js        # Express app setup
-│   │   └── server.js     # Server entry point
-│   ├── uploads/          # Uploaded images
+│   │   ├── utils/        # Helpers (giá, khả dụng, upload, JWT)
+│   │   ├── app.js        # Cấu hình Express app
+│   │   └── server.js     # Entry point server
+│   ├── uploads/          # Hình ảnh đã tải lên
 │   └── package.json
 └── frontend/
     ├── src/
     │   ├── components/   # React components
     │   ├── hooks/        # Custom hooks
-    │   ├── layouts/      # Page layouts
+    │   ├── layouts/      # Layout trang
     │   ├── lib/          # Utilities (categories, images)
-    │   ├── pages/        # Page components
-    │   ├── routes/       # React Router config
+    │   ├── pages/        # Components trang
+    │   ├── routes/       # Cấu hình React Router
     │   ├── services/     # API services
     │   ├── store/        # Zustand store
     │   ├── App.tsx       # Root component
@@ -50,55 +50,48 @@ tl-stay/
     └── package.json
 ```
 
-## Installation
+## Cài đặt
 
-### 1. Requirements
+### 1. Yêu cầu hệ thống
 
 - Node.js 20+
 - npm 10+
-- MongoDB is optional for local demo mode. Without `MONGO_URI`, the backend uses an
-  in-memory MongoDB database and seeds demo data automatically.
+- MongoDB là tùy chọn cho chế độ demo local. Nếu không có `MONGO_URI`, backend sử dụng
+  database MongoDB trong bộ nhớ và tự động thêm dữ liệu demo.
 
-### 2. NixOS / Nix development shell
+### 2. Cấu hình Windows PowerShell
 
-On NixOS, enter the dev shell before installing dependencies. The flake provides
-Node.js 22, npm, MongoDB, mongosh, and configures `mongodb-memory-server` to use
-the Nix-provided `mongod` binary.
+Nếu bạn gặp lỗi execution policy khi chạy npm commands trên Windows:
 
-```bash
-nix develop
-npm run install:all
-npm run doctor
-npm run dev
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 ```
 
-If you use `direnv`, run this once:
+Lệnh này cho phép chạy script trong phiên PowerShell hiện tại. Bạn cần chạy lệnh này mỗi khi mở cửa sổ PowerShell mới.
 
-```bash
-direnv allow
-```
+Hoặc bạn có thể sử dụng Git Bash hoặc Command Prompt thay vì PowerShell để tránh vấn đề này.
 
-### 3. Clone and install dependencies
+### 3. Clone và cài đặt dependencies
 
 ```bash
 npm run install:all
 npm run doctor
 ```
 
-### 4. Environment configuration
+### 4. Cấu hình môi trường
 
-For a quick local demo, `.env` files are optional. If `backend/.env` does not define
-`MONGO_URI`, the backend starts with an in-memory MongoDB database and seeds demo data
-automatically when the database is empty.
+Để chạy demo nhanh, file `.env` là tùy chọn. Nếu `backend/.env` không định nghĩa
+`MONGO_URI`, backend sẽ khởi động với database MongoDB trong bộ nhớ và tự động thêm dữ liệu demo
+khi database trống.
 
-For persistent local data, copy the example files and edit them:
+Để lưu dữ liệu local, copy file example và chỉnh sửa:
 
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-On Windows PowerShell, the same commands work as:
+Trên Windows PowerShell, các lệnh tương tự:
 
 ```powershell
 Copy-Item backend/.env.example backend/.env
@@ -108,8 +101,8 @@ Copy-Item frontend/.env.example frontend/.env
 **backend/.env**
 ```env
 PORT=5000
-# Leave MONGO_URI commented for zero-setup demo mode.
-# Uncomment only if you have a local MongoDB server running.
+# Để MONGO_URI comment để dùng chế độ demo zero-setup.
+# Bỏ comment chỉ khi bạn có local MongoDB server đang chạy.
 # MONGO_URI=mongodb://localhost:27017/tl-stay
 JWT_SECRET=your_secret_key_here
 JWT_EXPIRES_IN=7d
@@ -123,42 +116,41 @@ SEED_DEMO_ON_EMPTY=true
 VITE_API_URL=http://localhost:5000/api
 ```
 
-### 5. Seed demo data (optional)
+### 5. Thêm dữ liệu demo (tùy chọn)
 
-In development, TL-Stay seeds demo data automatically when the database is
-empty. Run the seed command manually when you want to reset the local demo
-database.
+Trong môi trường development, TL-Stay tự động thêm dữ liệu demo khi database trống.
+Chạy lệnh seed thủ công khi bạn muốn reset database demo local.
 
 ```bash
 cd backend
 npm run seed
 ```
 
-Demo dataset after seed:
+Dataset demo sau khi seed:
 - 14 users: 1 admin, 5 hosts, 8 guests
-- 26 listings across Vietnam, including 24 active listings and 2 inactive
-  listings for Admin Panel moderation
-- 49 bookings with confirmed, pending, cancelled, past, and future scenarios
-- 24 reviews plus guest wishlists for client-side and admin demos
-- 10 host-guest conversations with 40 messages for inbox/chat demos
-- Listing coordinates for OpenStreetMap previews on detail pages
+- 26 listings trên khắp Việt Nam, bao gồm 24 listings active và 2 listings
+  inactive cho Admin Panel moderation
+- 49 bookings với các tình huống confirmed, pending, cancelled, past, và future
+- 24 reviews plus guest wishlists cho demos client-side và admin
+- 10 cuộc hội thoại host-guest với 40 messages cho demos inbox/chat
+- Tọa độ listings để xem trước vị trí trên OpenStreetMap ở trang chi tiết
 
-Demo accounts (password: `password123`):
+Tài khoản demo (password: `password123`):
 - **Admin:** admin@tlstay.com / password123
 - **Host:** host@tlstay.com / password123
 - **Host:** mai.host@tlstay.com / password123
 - **Guest:** guest@tlstay.com / password123
 - **Guest:** binh.guest@tlstay.com / password123
 
-### 6. Run the application
+### 6. Chạy ứng dụng
 
-Run both backend and frontend from the project root:
+Chạy cả backend và frontend từ thư mục gốc dự án:
 
 ```bash
 npm run dev
 ```
 
-Or run them in two terminals:
+Hoặc chạy trong 2 terminal riêng biệt:
 
 ```bash
 # Terminal 1 - Backend
@@ -173,121 +165,121 @@ npm run dev
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:5000/api
 
-Quick health check:
+Kiểm tra nhanh:
 
 ```bash
 curl http://localhost:5000/api/health
 curl http://localhost:5000/api/listings
 ```
 
-## Features
+## Tính năng
 
-### Authentication
-- User registration (Guest/Host roles)
-- Login with JWT (httpOnly cookies)
-- Forgot/reset password with local development reset link
-- Change password for logged-in users
-- Protected routes with role-based access control
-- Auto-redirect on 401 errors
+### Xác thực
+- Đăng ký người dùng (Vai trò Guest/Host)
+- Đăng nhập với JWT (httpOnly cookies)
+- Quên/reset mật khẩu với link reset local development
+- Đổi mật khẩu cho người dùng đã đăng nhập
+- Routes được bảo vệ với role-based access control
+- Tự động redirect khi lỗi 401
 
 ### Listings
-- Search by location, dates, price, guests
-- Filter by category (Beach, Mountain, City, Cabin, etc.)
-- Price range filtering
-- Availability check for date ranges
-- Listing coordinates and OpenStreetMap location preview
-- Host dashboard: Create, update, delete listings
-- Image upload (up to 10 images, 5MB each, JPEG/PNG/WebP)
+- Tìm kiếm theo vị trí, ngày, giá, số khách
+- Lọc theo category (Bãi biển, Núi, Thành phố, Cabin, v.v.)
+- Lọc theo khoảng giá
+- Kiểm tra khả dụng cho khoảng ngày
+- Tọa độ listing và xem trước vị trí trên OpenStreetMap
+- Dashboard Host: Tạo, cập nhật, xóa listings
+- Tải lên hình ảnh (tối đa 10 hình, 5MB mỗi hình, JPEG/PNG/WebP)
 
-### Booking System
-- Book listings with date range and guest count
-- Double-booking prevention with race condition handling
-- Detailed price breakdown (subtotal, cleaning fee, service fee, tax, total)
-- Guest: View and cancel bookings
-- Host: View incoming bookings and cancel
+### Hệ thống Đặt phòng
+- Đặt phòng với khoảng ngày và số lượng khách
+- Ngăn chặn đặt trùng với xử lý race condition
+- Phân tích giá chi tiết (subtotal, phí dọn, phí dịch vụ, thuế, tổng)
+- Guest: Xem và hủy bookings
+- Host: Xem bookings đến và hủy
 
-### Reviews & Ratings
-- Guests can review completed bookings
-- Rating system (1-5 stars)
-- Display average rating and review count per listing
-- View all reviews for a listing
+### Đánh giá & Xếp hạng
+- Guest có thể đánh giá bookings đã hoàn thành
+- Hệ thống xếp hạng (1-5 sao)
+- Hiển thị xếp hạng trung bình và số đánh giá mỗi listing
+- Xem tất cả đánh giá cho một listing
 
-### Wishlist
-- Add/remove listings to favorites
-- View wishlist page with grid layout
-- Persistent favorites across sessions
+### Danh sách yêu thích
+- Thêm/xóa listings vào favorites
+- Xem trang wishlist với bố cục lưới
+- Favorites lưu trữ qua các phiên
 
-### Messaging
-- Guest can message the listing host from listing details
-- Host can message guests from incoming bookings
-- Inbox and conversation pages use REST polling for local-friendly chat demos
-- Admin can inspect recent messages and message counts
+### Nhắn tin
+- Guest có thể nhắn tin cho host listing từ trang chi tiết
+- Host có thể nhắn tin cho guest từ bookings đến
+- Trang inbox và hội thoại sử dụng REST polling cho demos chat local-friendly
+- Admin có thể kiểm tra tin nhắn gần đây và số lượng tin nhắn
 
 ### UI/UX
-- Responsive design with Tailwind CSS
-- Image lightbox for viewing listing photos
-- Category tabs for quick filtering
-- Rating stars display
-- Favorite button on listing cards
-- Loading skeletons and empty states
-- Form validation with error messages
+- Thiết kế responsive với Tailwind CSS
+- Lightbox hình ảnh để xem photos listing
+- Tab category để lọc nhanh
+- Hiển thị sao xếp hạng
+- Nút favorite trên card listing
+- Loading skeletons và empty states
+- Validation form với thông báo lỗi
 
 ## API Endpoints
 
 ### Auth
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Get current user
-- `POST /api/auth/forgot-password` - Create password reset link
-- `POST /api/auth/reset-password` - Reset password with token
-- `PATCH /api/auth/change-password` - Change password while logged in
+- `POST /api/auth/register` - Đăng ký user mới
+- `POST /api/auth/login` - Đăng nhập
+- `POST /api/auth/logout` - Đăng xuất
+- `GET /api/auth/me` - Lấy user hiện tại
+- `POST /api/auth/forgot-password` - Tạo link reset mật khẩu
+- `POST /api/auth/reset-password` - Reset mật khẩu với token
+- `PATCH /api/auth/change-password` - Đổi mật khẩu khi đã đăng nhập
 
 ### Listings
-- `GET /api/listings` - Get all listings with filters
-- `GET /api/listings/:id` - Get listing by ID
-- `GET /api/listings/host/me` - Get host's listings
-- `GET /api/listings/:id/availability` - Get booked date ranges
-- `POST /api/listings` - Create listing (Host only)
-- `PUT /api/listings/:id` - Update listing (Host only)
-- `DELETE /api/listings/:id` - Delete listing (Host only)
+- `GET /api/listings` - Lấy tất cả listings với filters
+- `GET /api/listings/:id` - Lấy listing theo ID
+- `GET /api/listings/host/me` - Lấy listings của host
+- `GET /api/listings/:id/availability` - Lấy khoảng ngày đã đặt
+- `POST /api/listings` - Tạo listing (Chỉ Host)
+- `PUT /api/listings/:id` - Cập nhật listing (Chỉ Host)
+- `DELETE /api/listings/:id` - Xóa listing (Chỉ Host)
 
 ### Bookings
-- `POST /api/bookings` - Create booking (Guest only)
-- `GET /api/bookings/me` - Get guest's bookings (Guest only)
-- `GET /api/bookings/host` - Get host's bookings (Host only)
-- `GET /api/bookings/:id` - Get booking by ID
-- `GET /api/bookings/quote` - Get price quote (public)
-- `PATCH /api/bookings/:id/cancel` - Cancel booking
+- `POST /api/bookings` - Tạo booking (Chỉ Guest)
+- `GET /api/bookings/me` - Lấy bookings của guest (Chỉ Guest)
+- `GET /api/bookings/host` - Lấy bookings của host (Chỉ Host)
+- `GET /api/bookings/:id` - Lấy booking theo ID
+- `GET /api/bookings/quote` - Lấy báo giá (public)
+- `PATCH /api/bookings/:id/cancel` - Hủy booking
 
 ### Reviews
-- `GET /api/reviews/listing/:listingId` - Get reviews for listing
-- `POST /api/reviews` - Create review
-- `DELETE /api/reviews/:id` - Delete review
-- `GET /api/reviews/me/pending` - Get pending reviews
+- `GET /api/reviews/listing/:listingId` - Lấy đánh giá cho listing
+- `POST /api/reviews` - Tạo đánh giá
+- `DELETE /api/reviews/:id` - Xóa đánh giá
+- `GET /api/reviews/me/pending` - Lấy đánh giá đang chờ
 
 ### Wishlist
-- `GET /api/wishlist` - Get user's wishlist
+- `GET /api/wishlist` - Lấy wishlist của user
 - `POST /api/wishlist/:listingId/toggle` - Toggle favorite
 
 ### Conversations
-- `GET /api/conversations` - Get current user's conversations
-- `POST /api/conversations` - Create or get listing conversation
-- `GET /api/conversations/:id/messages` - Get messages
-- `POST /api/conversations/:id/messages` - Send message
-- `PATCH /api/conversations/:id/read` - Mark conversation as read
+- `GET /api/conversations` - Lấy hội thoại của user hiện tại
+- `POST /api/conversations` - Tạo hoặc lấy hội thoại listing
+- `GET /api/conversations/:id/messages` - Lấy tin nhắn
+- `POST /api/conversations/:id/messages` - Gửi tin nhắn
+- `PATCH /api/conversations/:id/read` - Đánh dấu hội thoại đã đọc
 
 ### Admin
-- `GET /api/admin/stats` - Dashboard statistics
-- `GET /api/admin/users` - Manage users
-- `PATCH /api/admin/users/:id/role` - Update user role
-- `GET /api/admin/listings` - Manage listings
-- `PATCH /api/admin/listings/:id/status` - Show/hide listing
-- `GET /api/admin/bookings` - Manage bookings
-- `PATCH /api/admin/bookings/:id/cancel` - Cancel booking
-- `GET /api/admin/reviews` - Manage reviews
-- `DELETE /api/admin/reviews/:id` - Delete review
-- `GET /api/admin/messages` - Inspect recent messages
+- `GET /api/admin/stats` - Thống kê dashboard
+- `GET /api/admin/users` - Quản lý users
+- `PATCH /api/admin/users/:id/role` - Cập nhật vai trò user
+- `GET /api/admin/listings` - Quản lý listings
+- `PATCH /api/admin/listings/:id/status` - Hiện/ẩn listing
+- `GET /api/admin/bookings` - Quản lý bookings
+- `PATCH /api/admin/bookings/:id/cancel` - Hủy booking
+- `GET /api/admin/reviews` - Quản lý đánh giá
+- `DELETE /api/admin/reviews/:id` - Xóa đánh giá
+- `GET /api/admin/messages` - Kiểm tra tin nhắn gần đây
 
 ## Database Models
 
@@ -295,16 +287,16 @@ curl http://localhost:5000/api/listings
 - name, email, passwordHash
 - role (guest/host/admin)
 - avatarUrl
-- favoriteListings (array of listing IDs)
+- favoriteListings (mảng listing IDs)
 
 ### Listing
 - host (User reference)
 - title, description
 - pricePerNight, cleaningFee
 - maxGuests, bedrooms, beds, bathrooms
-- location (country, city, address, optional lat/lng)
-- amenities (array)
-- images (array)
+- location (country, city, address, tọa độ lat/lng tùy chọn)
+- amenities (mảng)
+- images (mảng)
 - category (enum)
 - avgRating, reviewCount
 - isActive (boolean)
@@ -335,36 +327,32 @@ curl http://localhost:5000/api/listings
 
 ### Root
 ```bash
-npm run install:all # Install backend and frontend dependencies
-npm run doctor      # Check local setup prerequisites
-npm run dev         # Start backend and frontend together
-npm test            # Run backend tests and frontend build
+npm run install:all # Cài đặt dependencies backend và frontend
+npm run doctor      # Kiểm tra prerequisites cài đặt local
+npm run dev         # Chạy backend và frontend cùng nhau
+npm test            # Chạy tests backend và build frontend
 ```
 
 ### Backend
 ```bash
-npm run dev      # Start with nodemon
-npm start        # Start with node
-npm run seed     # Seed demo data
+npm run dev      # Chạy với nodemon
+npm start        # Chạy với node
+npm run seed     # Thêm dữ liệu demo
 ```
 
 ### Frontend
 ```bash
-npm run dev      # Start Vite dev server
-npm run build    # Build for production
-npm run preview  # Preview production build
+npm run dev      # Chạy Vite dev server
+npm run build    # Build cho production
+npm run preview  # Xem trước build production
 ```
 
-## Security Considerations
+## Xem xét Bảo mật
 
-- Passwords hashed with bcryptjs
-- JWT tokens stored in httpOnly cookies
-- CORS configured for allowed origins
-- File upload validation (type, size)
-- Input validation with Zod schemas
-- Protected routes with authentication middleware
+- Mật khẩu được hash với bcryptjs
+- JWT tokens được lưu trong httpOnly cookies
+- CORS được cấu hình cho các origins được phép
+- Validation tải lên file (type, size)
+- Validation input với Zod schemas
+- Routes được bảo vệ với authentication middleware
 - Role-based access control
-
-## License
-
-MIT License - Academic Project
