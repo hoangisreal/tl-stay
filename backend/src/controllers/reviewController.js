@@ -2,6 +2,7 @@ import { z } from 'zod';
 import Review from '../models/Review.js';
 import Booking from '../models/Booking.js';
 import Listing from '../models/Listing.js';
+import { PAID_BOOKING_STATUSES } from '../utils/availability.js';
 import { objectIdSchema } from '../utils/validators.js';
 import { recomputeListingRating } from '../utils/reviewUtils.js';
 
@@ -43,9 +44,9 @@ export const create = async (req, res, next) => {
       res.status(403);
       return next(new Error('Only the guest can review this booking'));
     }
-    if (booking.status === 'cancelled') {
+    if (!PAID_BOOKING_STATUSES.includes(booking.status)) {
       res.status(400);
-      return next(new Error('Cannot review a cancelled booking'));
+      return next(new Error('Only completed paid bookings can be reviewed'));
     }
     if (new Date(booking.checkOut) > new Date()) {
       res.status(400);
@@ -130,7 +131,7 @@ export const myPendingReviews = async (req, res, next) => {
   try {
     const completedBookings = await Booking.find({
       guest: req.user._id,
-      status: { $ne: 'cancelled' },
+      status: { $in: PAID_BOOKING_STATUSES },
       checkOut: { $lt: new Date() },
     })
       .populate('listing', 'title images location')

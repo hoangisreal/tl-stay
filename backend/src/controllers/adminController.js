@@ -6,6 +6,7 @@ import BookingHold from '../models/BookingHold.js';
 import Review from '../models/Review.js';
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
+import { ACTIVE_BOOKING_STATUSES, PAID_BOOKING_STATUSES } from '../utils/availability.js';
 import { objectIdSchema } from '../utils/validators.js';
 import { recomputeListingRating } from '../utils/reviewUtils.js';
 
@@ -52,13 +53,13 @@ export const getStats = async (_req, res, next) => {
       Listing.countDocuments({ isActive: true }),
       Listing.countDocuments({ isActive: false }),
       Booking.countDocuments(),
-      Booking.countDocuments({ status: { $ne: 'cancelled' } }),
+      Booking.countDocuments({ status: { $in: ACTIVE_BOOKING_STATUSES } }),
       Booking.countDocuments({ status: 'cancelled' }),
       Review.countDocuments(),
       Conversation.countDocuments(),
       Message.countDocuments(),
       Booking.aggregate([
-        { $match: { status: { $ne: 'cancelled' } } },
+        { $match: { status: { $in: PAID_BOOKING_STATUSES } } },
         { $group: { _id: null, total: { $sum: '$totalPrice' } } },
       ]),
     ]);
@@ -209,7 +210,16 @@ export const cancelBooking = async (req, res, next) => {
       res.status(404);
       return next(new Error('Booking not found'));
     }
-    booking.status = 'cancelled';
+    if (['paid', 'confirmed'].includes(booking.status)) {
+      booking.status = 'refunded';
+      booking.payment.status = 'refunded';
+      booking.payment.refundedAt = new Date();
+      booking.payment.refundAmount = booking.totalPrice;
+    } else {
+      booking.status = 'cancelled';
+      booking.payment.status = 'cancelled';
+    }
+    booking.cancelledAt = new Date();
     await booking.save();
     await BookingHold.deleteMany({ booking: booking._id });
     const populated = await booking.populate([

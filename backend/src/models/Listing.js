@@ -26,6 +26,13 @@ const listingSchema = new mongoose.Schema(
       index: true,
     },
     cleaningFee: { type: Number, default: 0, min: 0 },
+    blockedDates: [{ type: Date }],
+    minNights: { type: Number, default: 1, min: 1 },
+    maxNights: { type: Number, min: 1 },
+    advanceNoticeDays: { type: Number, default: 0, min: 0 },
+    maxAdvanceBookingDays: { type: Number, default: 365, min: 1 },
+    checkInDays: [{ type: Number, min: 0, max: 6 }],
+    checkOutDays: [{ type: Number, min: 0, max: 6 }],
     avgRating: { type: Number, default: 0, min: 0, max: 5 },
     reviewCount: { type: Number, default: 0, min: 0 },
     isActive: { type: Boolean, default: true },
@@ -37,6 +44,7 @@ listingSchema.index({ 'location.city': 1 });
 listingSchema.index({ pricePerNight: 1 });
 listingSchema.index({ maxGuests: 1 });
 listingSchema.index({ avgRating: -1 });
+listingSchema.index({ blockedDates: 1 });
 
 const Listing = mongoose.model('Listing', listingSchema);
 

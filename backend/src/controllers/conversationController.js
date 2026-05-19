@@ -4,6 +4,7 @@ import Conversation from '../models/Conversation.js';
 import Listing from '../models/Listing.js';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
+import { ACTIVE_BOOKING_STATUSES } from '../utils/availability.js';
 import { objectIdSchema } from '../utils/validators.js';
 
 const idParamsSchema = z.object({
@@ -101,7 +102,7 @@ export const createOrGetConversation = async (req, res, next) => {
       const booking = await Booking.findOne({
         listing: listing._id,
         guest: guest._id,
-        status: { $ne: 'cancelled' },
+        status: { $in: ACTIVE_BOOKING_STATUSES },
       });
       if (!booking) {
         res.status(403);

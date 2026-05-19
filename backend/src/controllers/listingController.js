@@ -6,7 +6,13 @@ import Listing from '../models/Listing.js';
 import Booking from '../models/Booking.js';
 import BookingHold from '../models/BookingHold.js';
 import Review from '../models/Review.js';
-import { getBookedRanges } from '../utils/availability.js';
+import {
+  ACTIVE_BOOKING_STATUSES,
+  getAvailabilityRules,
+  getBookedRanges,
+  getListingsWithBlockedDates,
+  normalizeBlockedDates,
+} from '../utils/availability.js';
 import { dateOnlySchema, objectIdSchema, parseDateOnly } from '../utils/validators.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,6 +48,38 @@ const parseAmenities = (value) => {
   return parsed;
 };
 
+const parseJsonArray = (value, label) => {
+  if (!value) return [];
+  let parsed;
+  try {
+    parsed = typeof value === 'string' ? JSON.parse(value) : value;
+  } catch {
+    throw Object.assign(new Error(`${label} must be valid JSON`), { statusCode: 400 });
+  }
+  if (!Array.isArray(parsed)) {
+    throw Object.assign(new Error(`${label} must be a JSON array`), { statusCode: 400 });
+  }
+  return parsed;
+};
+
+const parseBlockedDates = (value) => {
+  const dates = parseJsonArray(value, 'Blocked dates');
+  for (const item of dates) {
+    if (!dateOnlySchema.safeParse(item).success || !parseDateOnly(item)) {
+      throw Object.assign(new Error('Blocked dates must use YYYY-MM-DD format'), { statusCode: 400 });
+    }
+  }
+  return normalizeBlockedDates(dates.map(parseDateOnly));
+};
+
+const parseDayList = (value, label) => {
+  const days = parseJsonArray(value, label);
+  if (days.some((day) => !Number.isInteger(Number(day)) || Number(day) < 0 || Number(day) > 6)) {
+    throw Object.assign(new Error(`${label} must contain day numbers from 0 to 6`), { statusCode: 400 });
+  }
+  return Array.from(new Set(days.map(Number))).sort((a, b) => a - b);
+};
+
 const CATEGORIES = ['beach', 'mountain', 'city', 'cabin', 'countryside', 'lakeside', 'tropical', 'pool', 'design'];
 const SORT_OPTIONS = ['-createdAt', 'createdAt', 'pricePerNight', '-pricePerNight', 'avgRating', '-avgRating'];
 
@@ -50,6 +88,13 @@ const listingSchema = z.object({
   description: z.string().min(10),
   pricePerNight: z.coerce.number().positive(),
   cleaningFee: z.coerce.number().min(0).optional(),
+  minNights: z.coerce.number().int().min(1).optional(),
+  maxNights: z.coerce.number().int().min(1).optional(),
+  advanceNoticeDays: z.coerce.number().int().min(0).optional(),
+  maxAdvanceBookingDays: z.coerce.number().int().min(1).optional(),
+  blockedDates: z.string().optional(),
+  checkInDays: z.string().optional(),
+  checkOutDays: z.string().optional(),
   maxGuests: z.coerce.number().int().min(1),
   bedrooms: z.coerce.number().int().min(1).optional(),
   beds: z.coerce.number().int().min(1).optional(),
@@ -107,10 +152,16 @@ export const create = async (req, res, next) => {
       await removeImageFiles(images);
       return next(new Error(parsed.error.errors[0].message));
     }
-    const { city, address, country, lat, lng, amenities, ...rest } = parsed.data;
+    const { city, address, country, lat, lng, amenities, blockedDates, checkInDays, checkOutDays, ...rest } = parsed.data;
     let amenitiesList;
+    let availabilityData;
     try {
       amenitiesList = parseAmenities(amenities);
+      availabilityData = {
+        blockedDates: blockedDates ? parseBlockedDates(blockedDates) : [],
+        checkInDays: checkInDays ? parseDayList(checkInDays, 'Check-in days') : [],
+        checkOutDays: checkOutDays ? parseDayList(checkOutDays, 'Check-out days') : [],
+      };
     } catch (err) {
       res.status(err.statusCode || 400);
       await removeImageFiles(images);
@@ -121,6 +172,7 @@ export const create = async (req, res, next) => {
       host: req.user._id,
       location: { city, address, country: country || 'Việt Nam', lat, lng },
       amenities: amenitiesList,
+      ...availabilityData,
       images,
     });
     res.status(201).json(listing);
@@ -149,12 +201,28 @@ export const getAll = async (req, res, next) => {
     }
     if (guests) filter.maxGuests = { $gte: guests };
     if (checkIn && checkOut) {
-      const bookedIds = await Booking.distinct('listing', {
-        status: { $ne: 'cancelled' },
-        checkIn: { $lt: parseDateOnly(checkOut) },
-        checkOut: { $gt: parseDateOnly(checkIn) },
+      const [bookedIds, blockedIds] = await Promise.all([
+        Booking.distinct('listing', {
+          status: { $in: ACTIVE_BOOKING_STATUSES },
+          checkIn: { $lt: parseDateOnly(checkOut) },
+          checkOut: { $gt: parseDateOnly(checkIn) },
+        }),
+        getListingsWithBlockedDates(parseDateOnly(checkIn), parseDateOnly(checkOut)),
+      ]);
+      filter._id = { $nin: [...bookedIds, ...blockedIds] };
+    }
+
+    if (checkIn && checkOut) {
+      const unavailableByRules = await Listing.distinct('_id', {
+        isActive: true,
+        $or: [
+          { minNights: { $gt: Math.round((parseDateOnly(checkOut) - parseDateOnly(checkIn)) / 86400000) } },
+          { maxNights: { $exists: true, $ne: null, $lt: Math.round((parseDateOnly(checkOut) - parseDateOnly(checkIn)) / 86400000) } },
+        ],
       });
-      filter._id = { $nin: bookedIds };
+      filter._id = {
+        $nin: [...(filter._id?.$nin || []), ...unavailableByRules],
+      };
     }
 
     const [listings, total] = await Promise.all([
@@ -199,7 +267,7 @@ export const update = async (req, res, next) => {
       await removeImageFiles(newImages);
       return next(new Error(parsed.error.errors[0].message));
     }
-    const { city, address, country, lat, lng, amenities, ...rest } = parsed.data;
+    const { city, address, country, lat, lng, amenities, blockedDates, checkInDays, checkOutDays, ...rest } = parsed.data;
     const updateData = { ...rest };
     if (city || address || country || lat !== undefined || lng !== undefined) {
       updateData.location = {
@@ -219,6 +287,15 @@ export const update = async (req, res, next) => {
         await removeImageFiles(newImages);
         return next(err);
       }
+    }
+    try {
+      if (blockedDates !== undefined) updateData.blockedDates = parseBlockedDates(blockedDates);
+      if (checkInDays !== undefined) updateData.checkInDays = parseDayList(checkInDays, 'Check-in days');
+      if (checkOutDays !== undefined) updateData.checkOutDays = parseDayList(checkOutDays, 'Check-out days');
+    } catch (err) {
+      res.status(err.statusCode || 400);
+      await removeImageFiles(newImages);
+      return next(err);
     }
     const replace = req.body.replaceImages === 'true';
     if (newImages.length) {
@@ -283,7 +360,14 @@ export const getAvailability = async (req, res, next) => {
       return next(new Error('Listing not found'));
     }
     const ranges = await getBookedRanges(parsed.data.id);
-    res.json(ranges);
+    const fullListing = await Listing.findById(parsed.data.id).select(
+      'blockedDates minNights maxNights advanceNoticeDays maxAdvanceBookingDays checkInDays checkOutDays'
+    );
+    res.json({
+      bookedRanges: ranges,
+      blockedDates: (fullListing.blockedDates || []).map((date) => date.toISOString().slice(0, 10)),
+      rules: getAvailabilityRules(fullListing),
+    });
   } catch (err) {
     next(err);
   }

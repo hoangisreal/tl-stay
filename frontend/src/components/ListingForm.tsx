@@ -30,6 +30,10 @@ const listingSchema = z.object({
     (value) => (typeof value === 'number' && Number.isNaN(value) ? undefined : value),
     z.number().min(0).optional()
   ),
+  minNights: z.number().int().min(1).optional(),
+  maxNights: z.number().int().min(1).optional(),
+  advanceNoticeDays: z.number().int().min(0).optional(),
+  maxAdvanceBookingDays: z.number().int().min(1).optional(),
   maxGuests: z.number().int().min(1, 'Ít nhất 1 khách'),
   bedrooms: optionalNumber,
   beds: optionalNumber,
@@ -54,6 +58,9 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
   const [serverError, setServerError] = useState('');
   const [amenities, setAmenities] = useState<string[]>(listing?.amenities || []);
   const [imageFiles, setImageFiles] = useState<FileList | null>(null);
+  const [blockedDatesText, setBlockedDatesText] = useState(
+    (listing?.blockedDates || []).map((date) => new Date(date).toISOString().slice(0, 10)).join(', ')
+  );
 
   const {
     register,
@@ -67,6 +74,10 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
           description: listing.description,
           pricePerNight: listing.pricePerNight,
           cleaningFee: listing.cleaningFee,
+          minNights: listing.minNights || 1,
+          maxNights: listing.maxNights || undefined,
+          advanceNoticeDays: listing.advanceNoticeDays || 0,
+          maxAdvanceBookingDays: listing.maxAdvanceBookingDays || 365,
           maxGuests: listing.maxGuests,
           bedrooms: listing.bedrooms,
           beds: listing.beds,
@@ -78,7 +89,7 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
           lng: listing.location.lng,
           category: listing.category,
         }
-      : { category: 'city', country: 'Việt Nam' },
+      : { category: 'city', country: 'Việt Nam', minNights: 1, advanceNoticeDays: 0, maxAdvanceBookingDays: 365 },
   });
 
   const handleFormSubmit = async (data: ListingFormData) => {
@@ -89,6 +100,11 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
         if (val !== undefined) formData.append(key, String(val));
       });
       formData.append('amenities', JSON.stringify(amenities));
+      const blockedDates = blockedDatesText
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      formData.append('blockedDates', JSON.stringify(blockedDates));
       if (imageFiles) {
         Array.from(imageFiles).forEach((file) => formData.append('images', file));
       }
@@ -116,6 +132,10 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
         <FormField id="pricePerNight" label="Giá / đêm (VNĐ)" type="number" error={errors.pricePerNight} {...register('pricePerNight', { valueAsNumber: true })} />
         <FormField id="cleaningFee" label="Phí dọn dẹp (VNĐ)" type="number" error={errors.cleaningFee} {...register('cleaningFee', { valueAsNumber: true })} />
         <FormField id="maxGuests" label="Số khách tối đa" type="number" error={errors.maxGuests} {...register('maxGuests', { valueAsNumber: true })} />
+        <FormField id="minNights" label="Số đêm tối thiểu" type="number" error={errors.minNights} {...register('minNights', { valueAsNumber: true })} />
+        <FormField id="maxNights" label="Số đêm tối đa" type="number" error={errors.maxNights} {...register('maxNights', { valueAsNumber: true })} />
+        <FormField id="advanceNoticeDays" label="Báo trước (ngày)" type="number" error={errors.advanceNoticeDays} {...register('advanceNoticeDays', { valueAsNumber: true })} />
+        <FormField id="maxAdvanceBookingDays" label="Mở lịch tối đa (ngày)" type="number" error={errors.maxAdvanceBookingDays} {...register('maxAdvanceBookingDays', { valueAsNumber: true })} />
         <FormField id="bedrooms" label="Phòng ngủ" type="number" error={errors.bedrooms} {...register('bedrooms', { valueAsNumber: true })} />
         <FormField id="beds" label="Giường" type="number" error={errors.beds} {...register('beds', { valueAsNumber: true })} />
         <FormField id="bathrooms" label="Phòng tắm" type="number" error={errors.bathrooms} {...register('bathrooms', { valueAsNumber: true })} />
@@ -150,6 +170,18 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-gray-700">Tiện ích</span>
         <AmenityPicker selected={amenities} onChange={setAmenities} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="blockedDates" className="text-sm font-medium text-gray-700">Ngày khoá lịch</label>
+        <textarea
+          id="blockedDates"
+          rows={2}
+          value={blockedDatesText}
+          onChange={(e) => setBlockedDatesText(e.target.value)}
+          placeholder="2026-06-01, 2026-06-02"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-rose-400 resize-none"
+        />
+        <p className="text-xs text-gray-500">Nhập các ngày không nhận khách, cách nhau bằng dấu phẩy.</p>
       </div>
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium text-gray-700">Ảnh phòng</span>

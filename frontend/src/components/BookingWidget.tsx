@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Listing } from '../services/listingService.ts';
+import { fetchAvailability, type AvailabilityResponse, type Listing } from '../services/listingService.ts';
 import { createBooking, fetchPriceQuote, type PriceBreakdown as PriceBreakdownType } from '../services/bookingService.ts';
 import useAuth from '../hooks/useAuth.ts';
 import PriceBreakdown from './PriceBreakdown.tsx';
@@ -19,9 +19,47 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
   const [loading, setLoading] = useState(false);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [quote, setQuote] = useState<PriceBreakdownType | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
   const [error, setError] = useState('');
 
   const today = new Date().toISOString().split('T')[0];
+  const dateOnly = (value: string | Date) => new Date(value).toISOString().slice(0, 10);
+  const addDays = (value: string, days: number) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
+  const enumerateDates = (start: string, end: string) => {
+    const dates: string[] = [];
+    const cursor = new Date(`${start}T00:00:00.000Z`);
+    const limit = new Date(`${end}T00:00:00.000Z`);
+    for (; cursor < limit; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+      dates.push(cursor.toISOString().slice(0, 10));
+    }
+    return dates;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAvailability(listing._id)
+      .then((res) => {
+        if (!cancelled) setAvailability(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setAvailability(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing._id]);
+
+  const unavailableDates = new Set([
+    ...(availability?.blockedDates || []),
+    ...(availability?.bookedRanges || []).flatMap((range) => enumerateDates(dateOnly(range.checkIn), dateOnly(range.checkOut))),
+  ]);
+
+  const minCheckIn = availability ? addDays(today, availability.rules.advanceNoticeDays) : today;
+  const maxCheckIn = availability ? addDays(today, availability.rules.maxAdvanceBookingDays) : undefined;
 
   // Use nights from server quote to avoid timezone issues; fall back to client estimate while loading
   const estimatedNights =
@@ -30,8 +68,28 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
       : 0;
   const nights = quote?.nights ?? estimatedNights;
 
+  const selectedRangeError = (() => {
+    if (!checkIn || !checkOut || !availability) return '';
+    if (enumerateDates(checkIn, checkOut).some((date) => unavailableDates.has(date))) {
+      return 'Khoảng ngày đã chọn có ngày không khả dụng';
+    }
+    if (availability.rules.checkInDays.length && !availability.rules.checkInDays.includes(new Date(`${checkIn}T00:00:00.000Z`).getUTCDay())) {
+      return 'Ngày nhận phòng này không được chủ nhà mở lịch';
+    }
+    if (availability.rules.checkOutDays.length && !availability.rules.checkOutDays.includes(new Date(`${checkOut}T00:00:00.000Z`).getUTCDay())) {
+      return 'Ngày trả phòng này không được chủ nhà mở lịch';
+    }
+    if (availability.rules.minNights && estimatedNights < availability.rules.minNights) {
+      return `Tối thiểu ${availability.rules.minNights} đêm`;
+    }
+    if (availability.rules.maxNights && estimatedNights > availability.rules.maxNights) {
+      return `Tối đa ${availability.rules.maxNights} đêm`;
+    }
+    return '';
+  })();
+
   useEffect(() => {
-    if (!checkIn || !checkOut || estimatedNights <= 0) {
+    if (!checkIn || !checkOut || estimatedNights <= 0 || selectedRangeError) {
       setQuote(null);
       return;
     }
@@ -52,12 +110,16 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
     return () => {
       cancelled = true;
     };
-  }, [checkIn, checkOut, listing._id, estimatedNights]);
+  }, [checkIn, checkOut, listing._id, estimatedNights, selectedRangeError]);
 
   const handleBook = async () => {
     if (!user) return navigate('/login');
     if (!checkIn || !checkOut || nights <= 0) {
       setError('Vui lòng chọn ngày nhận và trả phòng hợp lệ');
+      return;
+    }
+    if (selectedRangeError) {
+      setError(selectedRangeError);
       return;
     }
     try {
@@ -84,7 +146,8 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
             <p className="text-xs font-semibold text-gray-700">NHẬN PHÒNG</p>
             <input
               type="date"
-              min={today}
+              min={minCheckIn}
+              max={maxCheckIn}
               value={checkIn}
               onChange={(e) => setCheckIn(e.target.value)}
               className="text-sm outline-none w-full text-gray-700 mt-1"
@@ -95,6 +158,7 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
             <input
               type="date"
               min={checkIn || today}
+              max={maxCheckIn}
               value={checkOut}
               onChange={(e) => setCheckOut(e.target.value)}
               className="text-sm outline-none w-full text-gray-700 mt-1"
@@ -114,13 +178,17 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
           </select>
         </div>
       </div>
+      {selectedRangeError && <p className="text-xs text-red-500 mb-3">{selectedRangeError}</p>}
+      {availability && unavailableDates.size > 0 && (
+        <p className="text-xs text-gray-500 mb-3">Các ngày đã đặt hoặc bị chủ nhà khoá sẽ không thể thanh toán.</p>
+      )}
       {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
       <button
         onClick={handleBook}
-        disabled={loading}
+        disabled={loading || !!selectedRangeError}
         className="w-full bg-rose-500 hover:bg-rose-600 disabled:opacity-60 text-white font-semibold py-3 rounded-xl transition-colors"
       >
-        {loading ? 'Đang đặt...' : user ? 'Đặt phòng' : 'Đăng nhập để đặt phòng'}
+        {loading ? 'Đang giữ chỗ...' : user ? 'Giữ chỗ và thanh toán' : 'Đăng nhập để đặt phòng'}
       </button>
       {nights > 0 && (
         <div className="mt-4 space-y-2 text-sm text-gray-700">

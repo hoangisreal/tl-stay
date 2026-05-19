@@ -53,7 +53,7 @@ export default function MyBookingsPage() {
                     <PriceBreakdown pricePerNight={booking.listing.pricePerNight} breakdown={booking} />
                   )}
                 </div>
-                {booking.status === 'confirmed' && (
+                {['unpaid', 'paid', 'confirmed'].includes(booking.status) && (
                   <button
                     onClick={() => handleCancel(booking._id)}
                     className="text-xs border border-red-200 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50 self-start shrink-0"

@@ -15,6 +15,8 @@ const { default: User } = await import('../src/models/User.js');
 const { default: Listing } = await import('../src/models/Listing.js');
 const { default: Booking } = await import('../src/models/Booking.js');
 const { default: BookingHold } = await import('../src/models/BookingHold.js');
+const { default: PaymentEvent } = await import('../src/models/PaymentEvent.js');
+const { default: Notification } = await import('../src/models/Notification.js');
 const { default: Review } = await import('../src/models/Review.js');
 const { default: PasswordResetToken } = await import('../src/models/PasswordResetToken.js');
 const { default: Conversation } = await import('../src/models/Conversation.js');
@@ -72,6 +74,8 @@ before(async () => {
     Listing.init(),
     Booking.init(),
     BookingHold.init(),
+    PaymentEvent.init(),
+    Notification.init(),
     Review.init(),
     PasswordResetToken.init(),
     Conversation.init(),
@@ -85,6 +89,8 @@ beforeEach(async () => {
     Listing.deleteMany({}),
     Booking.deleteMany({}),
     BookingHold.deleteMany({}),
+    PaymentEvent.deleteMany({}),
+    Notification.deleteMany({}),
     Review.deleteMany({}),
     PasswordResetToken.deleteMany({}),
     Conversation.deleteMany({}),
@@ -225,6 +231,105 @@ test('inactive listings cannot be quoted or booked', async () => {
       guests: 1,
     })
     .expect(400);
+});
+
+test('booking payment lifecycle confirms only after payment success and releases failed holds', async () => {
+  const { user: host } = await registerAgent('host@example.com', 'host');
+  const { agent: guestAgent } = await registerAgent('guest@example.com');
+  const listing = await createListing(host);
+
+  const createRes = await guestAgent
+    .post('/api/bookings')
+    .send({
+      listing: listing._id.toString(),
+      checkIn: dateFromNow(13),
+      checkOut: dateFromNow(15),
+      guests: 1,
+    })
+    .expect(201);
+  assert.equal(createRes.body.status, 'unpaid');
+  assert.equal(createRes.body.payment.status, 'requires_payment');
+  assert.equal(await BookingHold.countDocuments({ booking: createRes.body._id }), 2);
+
+  const payRes = await guestAgent
+    .post(`/api/bookings/${createRes.body._id}/payments/mock`)
+    .send({ outcome: 'success' })
+    .expect(200);
+  assert.equal(payRes.body.status, 'paid');
+  assert.equal(payRes.body.payment.status, 'paid');
+  assert.equal(await BookingHold.countDocuments({ booking: createRes.body._id }), 2);
+
+  const paidBooking = await Booking.findById(createRes.body._id);
+  const webhookPayload = {
+    eventId: 'evt_duplicate_test',
+    type: 'payment.succeeded',
+    paymentIntentId: paidBooking.payment.intentId,
+  };
+  await request(app).post('/api/bookings/payments/webhook').send(webhookPayload).expect(200);
+  const duplicateRes = await request(app).post('/api/bookings/payments/webhook').send(webhookPayload).expect(200);
+  assert.equal(duplicateRes.body.duplicate, true);
+  assert.equal(await PaymentEvent.countDocuments({ eventId: webhookPayload.eventId }), 1);
+
+  const failedRes = await guestAgent
+    .post('/api/bookings')
+    .send({
+      listing: listing._id.toString(),
+      checkIn: dateFromNow(16),
+      checkOut: dateFromNow(18),
+      guests: 1,
+    })
+    .expect(201);
+  await guestAgent
+    .post(`/api/bookings/${failedRes.body._id}/payments/mock`)
+    .send({ outcome: 'failure' })
+    .expect(200);
+  assert.equal(await BookingHold.countDocuments({ booking: failedRes.body._id }), 0);
+
+  const retryRes = await guestAgent
+    .post('/api/bookings')
+    .send({
+      listing: listing._id.toString(),
+      checkIn: dateFromNow(16),
+      checkOut: dateFromNow(18),
+      guests: 1,
+    })
+    .expect(201);
+  assert.equal(retryRes.body.status, 'unpaid');
+});
+
+test('host blocked dates and stay rules are enforced in quotes, search and booking', async () => {
+  const { user: host } = await registerAgent('host@example.com', 'host');
+  const { agent: guestAgent } = await registerAgent('guest@example.com');
+  const listing = await createListing(host, {
+    minNights: 2,
+    maxNights: 5,
+    blockedDates: [new Date(`${dateFromNow(25)}T00:00:00.000Z`)],
+  });
+
+  await guestAgent
+    .get('/api/bookings/quote')
+    .query({ listing: listing._id.toString(), checkIn: dateFromNow(20), checkOut: dateFromNow(21) })
+    .expect(400);
+
+  await guestAgent
+    .post('/api/bookings')
+    .send({
+      listing: listing._id.toString(),
+      checkIn: dateFromNow(24),
+      checkOut: dateFromNow(26),
+      guests: 1,
+    })
+    .expect(400);
+
+  const searchRes = await request(app)
+    .get('/api/listings')
+    .query({ checkIn: dateFromNow(24), checkOut: dateFromNow(26) })
+    .expect(200);
+  assert.equal(searchRes.body.listings.some((item) => item._id === listing._id.toString()), false);
+
+  const availabilityRes = await request(app).get(`/api/listings/${listing._id}/availability`).expect(200);
+  assert.deepEqual(availabilityRes.body.blockedDates, [dateFromNow(25)]);
+  assert.equal(availabilityRes.body.rules.minNights, 2);
 });
 
 test('overlapping concurrent bookings reserve dates only once', async () => {

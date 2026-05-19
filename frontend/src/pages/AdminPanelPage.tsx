@@ -130,7 +130,7 @@ export default function AdminPanelPage() {
     return [
       { label: 'Người dùng', value: stats.users.toLocaleString('vi-VN'), sub: `${stats.admins} admin · ${stats.hosts} host · ${stats.guests} guest` },
       { label: 'Phòng', value: stats.listings.toLocaleString('vi-VN'), sub: `${stats.activeListings} đang hiển thị · ${stats.inactiveListings} tạm ẩn` },
-      { label: 'Đặt phòng', value: stats.bookings.toLocaleString('vi-VN'), sub: `${stats.confirmedBookings} hiệu lực · ${stats.cancelledBookings} đã huỷ` },
+      { label: 'Đặt phòng', value: stats.bookings.toLocaleString('vi-VN'), sub: `${stats.confirmedBookings} đang giữ lịch · ${stats.cancelledBookings} đã huỷ` },
       { label: 'Doanh thu', value: fmtMoney(stats.revenue), sub: `${stats.reviews} đánh giá` },
       { label: 'Tin nhắn', value: stats.messages.toLocaleString('vi-VN'), sub: `${stats.conversations} hội thoại` },
     ];
@@ -335,7 +335,7 @@ export default function AdminPanelPage() {
                 <Td>{fmtMoney(booking.totalPrice)}</Td>
                 <Td><Badge status={booking.status} /></Td>
                 <Td>
-                  {booking.status !== 'cancelled' && (
+                  {!['cancelled', 'refunded', 'failed'].includes(booking.status) && (
                     <button
                       disabled={busyId === booking._id}
                       onClick={() => cancelBooking(booking._id)}

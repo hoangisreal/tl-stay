@@ -64,7 +64,7 @@ export default function HostBookingsPage() {
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2 self-start">
-                  {booking.status !== 'cancelled' && (
+                  {['unpaid', 'paid', 'confirmed', 'pending'].includes(booking.status) && (
                     <button
                       onClick={() => handleMessageGuest(booking)}
                       disabled={busyId === booking._id}
@@ -73,7 +73,7 @@ export default function HostBookingsPage() {
                       Nhắn khách
                     </button>
                   )}
-                  {booking.status === 'confirmed' && (
+                  {['unpaid', 'paid', 'confirmed'].includes(booking.status) && (
                     <button
                       onClick={() => handleCancel(booking._id)}
                       className="text-xs border border-red-200 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50"

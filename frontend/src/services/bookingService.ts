@@ -17,7 +17,20 @@ export interface Booking extends PriceBreakdown {
   checkIn: string;
   checkOut: string;
   guests: number;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'unpaid' | 'paid' | 'refunded' | 'failed' | 'cancelled' | 'pending' | 'confirmed';
+  payment?: {
+    provider: string;
+    intentId: string;
+    status: 'requires_payment' | 'paid' | 'refunded' | 'failed' | 'cancelled';
+    amount: number;
+    currency: string;
+    checkoutUrl?: string;
+    dueAt?: string;
+    paidAt?: string;
+    failedAt?: string;
+    refundedAt?: string;
+    refundAmount?: number;
+  };
   createdAt: string;
 }
 
@@ -45,3 +58,6 @@ export const cancelBooking = (id: string) =>
 
 export const fetchBookingById = (id: string) =>
   apiClient.get<Booking>(`/bookings/${id}`);
+
+export const simulatePayment = (id: string, outcome: 'success' | 'failure' = 'success') =>
+  apiClient.post<Booking>(`/bookings/${id}/payments/mock`, { outcome });

@@ -25,6 +25,13 @@ export interface Listing {
   description: string;
   pricePerNight: number;
   cleaningFee: number;
+  blockedDates?: string[];
+  minNights?: number;
+  maxNights?: number | null;
+  advanceNoticeDays?: number;
+  maxAdvanceBookingDays?: number;
+  checkInDays?: number[];
+  checkOutDays?: number[];
   maxGuests: number;
   bedrooms: number;
   beds: number;
@@ -81,5 +88,18 @@ export const updateListing = (id: string, formData: FormData) =>
 export const deleteListing = (id: string) =>
   apiClient.delete(`/listings/${id}`);
 
+export interface AvailabilityResponse {
+  bookedRanges: { checkIn: string; checkOut: string }[];
+  blockedDates: string[];
+  rules: {
+    minNights: number;
+    maxNights: number | null;
+    advanceNoticeDays: number;
+    maxAdvanceBookingDays: number;
+    checkInDays: number[];
+    checkOutDays: number[];
+  };
+}
+
 export const fetchAvailability = (id: string) =>
-  apiClient.get<{ checkIn: string; checkOut: string }[]>(`/listings/${id}/availability`);
+  apiClient.get<AvailabilityResponse>(`/listings/${id}/availability`);
