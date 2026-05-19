@@ -6,6 +6,7 @@ import { z } from 'zod';
 import FormField from '../components/FormField.tsx';
 import FormError from '../components/FormError.tsx';
 import { changePasswordRequest } from '../services/authService.ts';
+import { getApiError } from '../lib/getApiError.ts';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Vui lòng nhập mật khẩu hiện tại'),
@@ -39,11 +40,7 @@ export default function ChangePasswordPage() {
       setMessage(res.data.message);
       reset();
     } catch (err: unknown) {
-      const responseMessage =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setServerError(responseMessage || 'Không thể đổi mật khẩu');
+      setServerError(getApiError(err, 'Không thể đổi mật khẩu'));
     }
   };
 

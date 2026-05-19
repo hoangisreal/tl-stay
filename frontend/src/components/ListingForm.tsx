@@ -9,6 +9,7 @@ import AmenityPicker from './AmenityPicker.tsx';
 import ImageUploader from './ImageUploader.tsx';
 import { resolveImageUrl } from '../lib/images.ts';
 import { CATEGORIES } from '../lib/categories.ts';
+import { getApiError } from '../lib/getApiError.ts';
 
 const optionalNumber = z.preprocess(
   (value) => (typeof value === 'number' && Number.isNaN(value) ? undefined : value),
@@ -93,11 +94,7 @@ export default function ListingForm({ listing, onSubmit, onCancel }: ListingForm
       }
       await onSubmit(formData);
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setServerError(message || 'Có lỗi xảy ra');
+      setServerError(getApiError(err, 'Có lỗi xảy ra'));
     }
   };
 

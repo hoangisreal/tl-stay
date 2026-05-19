@@ -4,6 +4,7 @@ import type { Listing } from '../services/listingService.ts';
 import { createBooking, fetchPriceQuote, type PriceBreakdown as PriceBreakdownType } from '../services/bookingService.ts';
 import useAuth from '../hooks/useAuth.ts';
 import PriceBreakdown from './PriceBreakdown.tsx';
+import { getApiError } from '../lib/getApiError.ts';
 
 interface BookingWidgetProps {
   listing: Listing;
@@ -22,13 +23,15 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
 
   const today = new Date().toISOString().split('T')[0];
 
-  const nights =
+  // Use nights from server quote to avoid timezone issues; fall back to client estimate while loading
+  const estimatedNights =
     checkIn && checkOut
       ? Math.max(0, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000))
       : 0;
+  const nights = quote?.nights ?? estimatedNights;
 
   useEffect(() => {
-    if (!checkIn || !checkOut || nights <= 0) {
+    if (!checkIn || !checkOut || estimatedNights <= 0) {
       setQuote(null);
       return;
     }
@@ -49,7 +52,7 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
     return () => {
       cancelled = true;
     };
-  }, [checkIn, checkOut, listing._id, nights]);
+  }, [checkIn, checkOut, listing._id, estimatedNights]);
 
   const handleBook = async () => {
     if (!user) return navigate('/login');
@@ -63,11 +66,7 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
       const { data } = await createBooking({ listing: listing._id, checkIn, checkOut, guests });
       navigate(`/bookings/${data._id}/confirmation`);
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setError(message || 'Đặt phòng thất bại');
+      setError(getApiError(err, 'Đặt phòng thất bại'));
     } finally {
       setLoading(false);
     }

@@ -224,16 +224,16 @@ export const getById = async (req, res, next) => {
       res.status(400);
       return next(new Error(parsed.error.errors[0].message));
     }
+    // Populate listing with host so we can authorise without a second DB query
     const booking = await Booking.findById(parsed.data.id)
-      .populate('listing', 'title images location pricePerNight')
+      .populate({ path: 'listing', select: 'title images location pricePerNight host' })
       .populate('guest', 'name email');
     if (!booking) {
       res.status(404);
       return next(new Error('Booking not found'));
     }
     const isGuest = booking.guest._id.toString() === req.user._id.toString();
-    const listing = await Listing.findById(booking.listing._id || booking.listing).select('host');
-    const isHost = listing?.host.toString() === req.user._id.toString();
+    const isHost = booking.listing?.host?.toString() === req.user._id.toString();
     if (!isGuest && !isHost) {
       res.status(403);
       return next(new Error('Forbidden'));

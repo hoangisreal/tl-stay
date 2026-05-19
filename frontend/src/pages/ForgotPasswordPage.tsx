@@ -6,6 +6,7 @@ import { z } from 'zod';
 import FormField from '../components/FormField.tsx';
 import FormError from '../components/FormError.tsx';
 import { forgotPasswordRequest } from '../services/authService.ts';
+import { getApiError } from '../lib/getApiError.ts';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email('Email không hợp lệ'),
@@ -32,11 +33,7 @@ export default function ForgotPasswordPage() {
       setMessage(res.data.message);
       setResetLink(res.data.resetLink || '');
     } catch (err: unknown) {
-      const responseMessage =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setServerError(responseMessage || 'Không thể tạo link đặt lại mật khẩu');
+      setServerError(getApiError(err, 'Không thể tạo link đặt lại mật khẩu'));
     }
   };
 

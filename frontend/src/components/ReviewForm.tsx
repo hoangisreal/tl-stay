@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import RatingStars from './RatingStars.tsx';
+import { getApiError } from '../lib/getApiError.ts';
 
 interface ReviewFormProps {
   onSubmit: (data: { rating: number; comment: string }) => Promise<void>;
@@ -24,11 +25,7 @@ export default function ReviewForm({ onSubmit, onCancel }: ReviewFormProps) {
       await onSubmit({ rating, comment: comment.trim() });
       setComment('');
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setError(msg || 'Gửi đánh giá thất bại');
+      setError(getApiError(err, 'Gửi đánh giá thất bại'));
     } finally {
       setSubmitting(false);
     }

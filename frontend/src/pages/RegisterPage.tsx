@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth.ts';
 import FormField from '../components/FormField.tsx';
 import FormError from '../components/FormError.tsx';
+import { getApiError } from '../lib/getApiError.ts';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Tên phải có ít nhất 2 ký tự'),
@@ -36,11 +37,7 @@ export default function RegisterPage() {
       await registerUser(data);
       navigate('/');
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setServerError(message || 'Đăng ký thất bại');
+      setServerError(getApiError(err, 'Đăng ký thất bại'));
     }
   };
 

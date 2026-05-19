@@ -10,7 +10,7 @@ connectDB()
   .then(async () => {
     const shouldSeed =
       process.env.NODE_ENV !== 'production' &&
-      process.env.SEED_DEMO_ON_EMPTY !== 'false' &&
+      process.env.SEED_DEMO_ON_EMPTY === 'true' &&
       (await Listing.countDocuments()) === 0;
 
     if (shouldSeed) {

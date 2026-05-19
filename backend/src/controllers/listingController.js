@@ -30,9 +30,14 @@ const uploadedImagePaths = (files = []) => files.map((f) => `/uploads/listings/$
 
 const parseAmenities = (value) => {
   if (!value) return [];
-  const parsed = JSON.parse(value);
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw Object.assign(new Error('Amenities must be valid JSON'), { statusCode: 400 });
+  }
   if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) {
-    throw new Error('Amenities must be a JSON array of strings');
+    throw Object.assign(new Error('Amenities must be a JSON array of strings'), { statusCode: 400 });
   }
   return parsed;
 };
@@ -107,8 +112,9 @@ export const create = async (req, res, next) => {
     try {
       amenitiesList = parseAmenities(amenities);
     } catch (err) {
-      res.status(400);
-      throw err;
+      res.status(err.statusCode || 400);
+      await removeImageFiles(images);
+      return next(err);
     }
     const listing = await Listing.create({
       ...rest,
@@ -209,8 +215,9 @@ export const update = async (req, res, next) => {
       try {
         updateData.amenities = parseAmenities(amenities);
       } catch (err) {
-        res.status(400);
-        throw err;
+        res.status(err.statusCode || 400);
+        await removeImageFiles(newImages);
+        return next(err);
       }
     }
     const replace = req.body.replaceImages === 'true';

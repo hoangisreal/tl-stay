@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+const apiBaseUrl = import.meta.env.VITE_API_URL;
+
+if (!apiBaseUrl && import.meta.env.PROD) {
+  // In production builds VITE_API_URL must be set at build time.
+  throw new Error('VITE_API_URL is not set. Configure it before building for production.');
+}
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: apiBaseUrl || 'http://localhost:5000/api',
   withCredentials: true,
 });
 

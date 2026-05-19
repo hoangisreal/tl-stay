@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Badge from '../components/Badge.tsx';
 import {
   cancelAdminBooking,
@@ -41,43 +41,89 @@ const fmtDate = (value: string) => new Date(value).toLocaleDateString('vi-VN');
 export default function AdminPanelPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('users');
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [reviews, setReviews] = useState<AdminReview[]>([]);
-  const [messages, setMessages] = useState<AdminMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Per-tab state: data is null until the tab is first visited
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [listings, setListings] = useState<Listing[] | null>(null);
+  const [bookings, setBookings] = useState<Booking[] | null>(null);
+  const [reviews, setReviews] = useState<AdminReview[] | null>(null);
+  const [messages, setMessages] = useState<AdminMessage[] | null>(null);
+
+  const [tabLoading, setTabLoading] = useState(false);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
 
-  const loadAdminData = async () => {
-    setLoading(true);
-    setError('');
+  // Track which tabs have been loaded so we don't refetch unless refresh is clicked
+  const loadedTabs = useRef<Set<TabKey>>(new Set());
+
+  const loadStats = async () => {
+    setStatsLoading(true);
     try {
-      const [statsRes, usersRes, listingsRes, bookingsRes, reviewsRes, messagesRes] = await Promise.all([
-        fetchAdminStats(),
-        fetchAdminUsers(),
-        fetchAdminListings(),
-        fetchAdminBookings(),
-        fetchAdminReviews(),
-        fetchAdminMessages(),
-      ]);
-      setStats(statsRes.data);
-      setUsers(usersRes.data);
-      setListings(listingsRes.data);
-      setBookings(bookingsRes.data);
-      setReviews(reviewsRes.data);
-      setMessages(messagesRes.data);
+      const res = await fetchAdminStats();
+      setStats(res.data);
     } catch {
-      setError('Không thể tải dữ liệu quản trị');
+      setError('Không thể tải thống kê');
     } finally {
-      setLoading(false);
+      setStatsLoading(false);
     }
   };
 
+  const loadTab = async (tab: TabKey, force = false) => {
+    if (!force && loadedTabs.current.has(tab)) return;
+    setTabLoading(true);
+    setError('');
+    try {
+      switch (tab) {
+        case 'users': {
+          const res = await fetchAdminUsers();
+          setUsers(res.data.users);
+          break;
+        }
+        case 'listings': {
+          const res = await fetchAdminListings();
+          setListings(res.data.listings);
+          break;
+        }
+        case 'bookings': {
+          const res = await fetchAdminBookings();
+          setBookings(res.data.bookings);
+          break;
+        }
+        case 'reviews': {
+          const res = await fetchAdminReviews();
+          setReviews(res.data.reviews);
+          break;
+        }
+        case 'messages': {
+          const res = await fetchAdminMessages();
+          setMessages(res.data.messages);
+          break;
+        }
+      }
+      loadedTabs.current.add(tab);
+    } catch {
+      setError(`Không thể tải dữ liệu tab ${tab}`);
+    } finally {
+      setTabLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    loadedTabs.current.clear();
+    await Promise.all([loadStats(), loadTab(activeTab, true)]);
+  };
+
+  // Load stats once on mount and load the initial (users) tab
   useEffect(() => {
-    loadAdminData();
-  }, []);
+    loadStats();
+    loadTab('users');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTabChange = (tab: TabKey) => {
+    setActiveTab(tab);
+    loadTab(tab);
+  };
 
   const statCards = useMemo(() => {
     if (!stats) return [];
@@ -94,7 +140,7 @@ export default function AdminPanelPage() {
     setBusyId(userId);
     try {
       const { data } = await updateAdminUserRole(userId, role);
-      setUsers((prev) => prev.map((user) => (user._id === userId ? data : user)));
+      setUsers((prev) => prev ? prev.map((u) => (u._id === userId ? data : u)) : prev);
     } finally {
       setBusyId('');
     }
@@ -104,7 +150,7 @@ export default function AdminPanelPage() {
     setBusyId(listingId);
     try {
       const { data } = await updateAdminListingStatus(listingId, isActive);
-      setListings((prev) => prev.map((listing) => (listing._id === listingId ? data : listing)));
+      setListings((prev) => prev ? prev.map((l) => (l._id === listingId ? data : l)) : prev);
       setStats((prev) =>
         prev
           ? {
@@ -124,7 +170,7 @@ export default function AdminPanelPage() {
     setBusyId(bookingId);
     try {
       const { data } = await cancelAdminBooking(bookingId);
-      setBookings((prev) => prev.map((booking) => (booking._id === bookingId ? data : booking)));
+      setBookings((prev) => prev ? prev.map((b) => (b._id === bookingId ? data : b)) : prev);
     } finally {
       setBusyId('');
     }
@@ -135,14 +181,14 @@ export default function AdminPanelPage() {
     setBusyId(reviewId);
     try {
       await deleteAdminReview(reviewId);
-      setReviews((prev) => prev.filter((review) => review._id !== reviewId));
+      setReviews((prev) => prev ? prev.filter((r) => r._id !== reviewId) : prev);
       setStats((prev) => (prev ? { ...prev, reviews: Math.max(0, prev.reviews - 1) } : prev));
     } finally {
       setBusyId('');
     }
   };
 
-  if (loading) return <div className="flex justify-center py-20">Đang tải...</div>;
+  if (statsLoading) return <div className="flex justify-center py-20">Đang tải...</div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
@@ -152,7 +198,7 @@ export default function AdminPanelPage() {
           <p className="text-sm text-gray-500">Quản lý dữ liệu, thống kê và phân quyền hệ thống.</p>
         </div>
         <button
-          onClick={loadAdminData}
+          onClick={handleRefresh}
           className="w-full sm:w-auto border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50"
         >
           Làm mới
@@ -180,7 +226,7 @@ export default function AdminPanelPage() {
           {tabs.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
               className={`px-4 py-3 text-sm font-medium border-b-2 ${
                 activeTab === tab.key
                   ? 'border-rose-500 text-rose-600'
@@ -193,7 +239,9 @@ export default function AdminPanelPage() {
         </div>
       </div>
 
-      {activeTab === 'users' && (
+      {tabLoading && <div className="text-sm text-gray-500 py-4 text-center">Đang tải...</div>}
+
+      {!tabLoading && activeTab === 'users' && users !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>
@@ -227,7 +275,7 @@ export default function AdminPanelPage() {
         </AdminTable>
       )}
 
-      {activeTab === 'listings' && (
+      {!tabLoading && activeTab === 'listings' && listings !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>
@@ -263,7 +311,7 @@ export default function AdminPanelPage() {
         </AdminTable>
       )}
 
-      {activeTab === 'bookings' && (
+      {!tabLoading && activeTab === 'bookings' && bookings !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>
@@ -303,7 +351,7 @@ export default function AdminPanelPage() {
         </AdminTable>
       )}
 
-      {activeTab === 'reviews' && (
+      {!tabLoading && activeTab === 'reviews' && reviews !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>
@@ -341,7 +389,7 @@ export default function AdminPanelPage() {
         </AdminTable>
       )}
 
-      {activeTab === 'messages' && (
+      {!tabLoading && activeTab === 'messages' && messages !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>

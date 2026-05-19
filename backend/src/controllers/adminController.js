@@ -7,6 +7,7 @@ import Review from '../models/Review.js';
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
 import { objectIdSchema } from '../utils/validators.js';
+import { recomputeListingRating } from '../utils/reviewUtils.js';
 
 const idParamsSchema = z.object({
   id: objectIdSchema,
@@ -20,17 +21,10 @@ const listingStatusSchema = z.object({
   isActive: z.boolean(),
 });
 
-const recomputeListingRating = async (listingId) => {
-  const stats = await Review.aggregate([
-    { $match: { listing: listingId } },
-    { $group: { _id: '$listing', avg: { $avg: '$rating' }, count: { $sum: 1 } } },
-  ]);
-  const { avg = 0, count = 0 } = stats[0] || {};
-  await Listing.findByIdAndUpdate(listingId, {
-    avgRating: Math.round(avg * 10) / 10,
-    reviewCount: count,
-  });
-};
+const paginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
 
 export const getStats = async (_req, res, next) => {
   try {
@@ -90,10 +84,19 @@ export const getStats = async (_req, res, next) => {
   }
 };
 
-export const listUsers = async (_req, res, next) => {
+export const listUsers = async (req, res, next) => {
   try {
-    const users = await User.find().select('-passwordHash').sort('-createdAt');
-    res.json(users);
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const { page, limit } = parsed.data;
+    const [users, total] = await Promise.all([
+      User.find().select('-passwordHash').sort('-createdAt').skip((page - 1) * limit).limit(limit),
+      User.countDocuments(),
+    ]);
+    res.json({ users, page, limit, total, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }
@@ -126,12 +129,23 @@ export const updateUserRole = async (req, res, next) => {
   }
 };
 
-export const listListings = async (_req, res, next) => {
+export const listListings = async (req, res, next) => {
   try {
-    const listings = await Listing.find()
-      .populate('host', 'name email avatarUrl')
-      .sort('-createdAt');
-    res.json(listings);
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const { page, limit } = parsed.data;
+    const [listings, total] = await Promise.all([
+      Listing.find()
+        .populate('host', 'name email avatarUrl')
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Listing.countDocuments(),
+    ]);
+    res.json({ listings, page, limit, total, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }
@@ -160,13 +174,24 @@ export const updateListingStatus = async (req, res, next) => {
   }
 };
 
-export const listBookings = async (_req, res, next) => {
+export const listBookings = async (req, res, next) => {
   try {
-    const bookings = await Booking.find()
-      .populate('listing', 'title images location host')
-      .populate('guest', 'name email')
-      .sort('-createdAt');
-    res.json(bookings);
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const { page, limit } = parsed.data;
+    const [bookings, total] = await Promise.all([
+      Booking.find()
+        .populate('listing', 'title images location host')
+        .populate('guest', 'name email')
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Booking.countDocuments(),
+    ]);
+    res.json({ bookings, page, limit, total, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }
@@ -197,13 +222,24 @@ export const cancelBooking = async (req, res, next) => {
   }
 };
 
-export const listReviews = async (_req, res, next) => {
+export const listReviews = async (req, res, next) => {
   try {
-    const reviews = await Review.find()
-      .populate('listing', 'title location')
-      .populate('guest', 'name email avatarUrl')
-      .sort('-createdAt');
-    res.json(reviews);
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const { page, limit } = parsed.data;
+    const [reviews, total] = await Promise.all([
+      Review.find()
+        .populate('listing', 'title location')
+        .populate('guest', 'name email avatarUrl')
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Review.countDocuments(),
+    ]);
+    res.json({ reviews, page, limit, total, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }
@@ -230,22 +266,32 @@ export const deleteReview = async (req, res, next) => {
   }
 };
 
-export const listMessages = async (_req, res, next) => {
+export const listMessages = async (req, res, next) => {
   try {
-    const messages = await Message.find()
-      .populate({
-        path: 'conversation',
-        select: 'listing host guest',
-        populate: [
-          { path: 'listing', select: 'title location' },
-          { path: 'host', select: 'name email avatarUrl' },
-          { path: 'guest', select: 'name email avatarUrl' },
-        ],
-      })
-      .populate('sender', 'name email avatarUrl')
-      .sort('-createdAt')
-      .limit(80);
-    res.json(messages);
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+    const { page, limit } = parsed.data;
+    const [messages, total] = await Promise.all([
+      Message.find()
+        .populate({
+          path: 'conversation',
+          select: 'listing host guest',
+          populate: [
+            { path: 'listing', select: 'title location' },
+            { path: 'host', select: 'name email avatarUrl' },
+            { path: 'guest', select: 'name email avatarUrl' },
+          ],
+        })
+        .populate('sender', 'name email avatarUrl')
+        .sort('-createdAt')
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Message.countDocuments(),
+    ]);
+    res.json({ messages, page, limit, total, pages: Math.ceil(total / limit) });
   } catch (err) {
     next(err);
   }

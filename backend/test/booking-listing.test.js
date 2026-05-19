@@ -335,8 +335,20 @@ test('admin can inspect stats, manage roles, deactivate listings and cancel book
   assert.equal(stats.body.conversations, 1);
   assert.equal(stats.body.messages, 1);
 
+  // Admin list endpoints now return paginated responses
   const adminMessages = await adminAgent.get('/api/admin/messages').expect(200);
-  assert.equal(adminMessages.body.length, 1);
+  assert.equal(adminMessages.body.messages.length, 1);
+  assert.equal(adminMessages.body.total, 1);
+
+  const adminUsers = await adminAgent.get('/api/admin/users').expect(200);
+  assert.equal(adminUsers.body.users.length, 3);
+  assert.equal(adminUsers.body.total, 3);
+
+  const adminListings = await adminAgent.get('/api/admin/listings').expect(200);
+  assert.equal(adminListings.body.listings.length, 1);
+
+  const adminBookings = await adminAgent.get('/api/admin/bookings').expect(200);
+  assert.equal(adminBookings.body.bookings.length, 1);
 
   const roleRes = await adminAgent
     .patch(`/api/admin/users/${guest._id}/role`)
@@ -355,4 +367,15 @@ test('admin can inspect stats, manage roles, deactivate listings and cancel book
     .expect(200);
   assert.equal(cancelRes.body.status, 'cancelled');
   assert.equal(await BookingHold.countDocuments({ booking: bookingRes.body._id }), 0);
+});
+
+test('admin pagination returns correct page metadata', async () => {
+  const { agent: adminAgent } = await registerAdminAgent('admin@example.com');
+
+  const res = await adminAgent.get('/api/admin/users?page=1&limit=2').expect(200);
+  assert.equal(res.body.page, 1);
+  assert.equal(res.body.limit, 2);
+  assert.ok(typeof res.body.total === 'number');
+  assert.ok(typeof res.body.pages === 'number');
+  assert.ok(Array.isArray(res.body.users));
 });

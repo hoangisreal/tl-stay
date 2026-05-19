@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import useAuth from '../hooks/useAuth.ts';
 import FormField from '../components/FormField.tsx';
 import FormError from '../components/FormError.tsx';
+import { getApiError } from '../lib/getApiError.ts';
 
 const loginSchema = z.object({
   email: z.string().email('Email không hợp lệ'),
@@ -33,11 +34,7 @@ export default function LoginPage() {
       const redirect = searchParams.get('redirect');
       navigate(redirect && redirect.startsWith('/') ? redirect : '/');
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setServerError(message || 'Đăng nhập thất bại');
+      setServerError(getApiError(err, 'Đăng nhập thất bại'));
     }
   };
 

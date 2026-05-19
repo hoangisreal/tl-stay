@@ -10,10 +10,12 @@ import FavoriteButton from '../components/FavoriteButton.tsx';
 import useAuth from '../hooks/useAuth.ts';
 import { fetchListingReviews, type Review } from '../services/reviewService.ts';
 import { createConversation } from '../services/conversationService.ts';
+import { getApiError } from '../lib/getApiError.ts';
 
 export default function ListingDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [listing, setListing] = useState<Listing | null>(null);
+  const [fetchError, setFetchError] = useState('');
   const [loading, setLoading] = useState(true);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -26,16 +28,30 @@ export default function ListingDetailsPage() {
 
   useEffect(() => {
     if (!id) return;
+    setFetchError('');
     fetchListingById(id)
       .then((res) => setListing(res.data))
+      .catch((err) => {
+        const status = err?.response?.status;
+        setFetchError(status === 404 ? 'Không tìm thấy phòng này.' : 'Không thể tải thông tin phòng. Vui lòng thử lại.');
+      })
       .finally(() => setLoading(false));
     fetchListingReviews(id)
       .then((res) => setReviews(res.data))
+      .catch(() => {/* reviews are non-critical, silently skip */})
       .finally(() => setReviewsLoading(false));
   }, [id]);
 
   if (loading) return <div className="flex justify-center py-20">Đang tải...</div>;
-  if (!listing) return <div className="flex justify-center py-20 text-gray-500">Không tìm thấy phòng</div>;
+  if (fetchError) return (
+    <div className="flex flex-col items-center justify-center py-20 gap-3 text-center px-4">
+      <p className="text-gray-500">{fetchError}</p>
+      <button onClick={() => navigate(-1)} className="text-sm text-rose-500 hover:underline">
+        Quay lại
+      </button>
+    </div>
+  );
+  if (!listing) return null;
 
   const images = listing.images.length
     ? listing.images.map(resolveImageUrl)
@@ -55,11 +71,7 @@ export default function ListingDetailsPage() {
       const { data } = await createConversation({ listing: listing._id });
       navigate(`/messages/${data._id}`);
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setActionError(message || 'Không thể mở hội thoại');
+      setActionError(getApiError(err, 'Không thể mở hội thoại'));
     } finally {
       setMessageLoading(false);
     }

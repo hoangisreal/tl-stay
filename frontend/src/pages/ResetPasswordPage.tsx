@@ -6,6 +6,7 @@ import { z } from 'zod';
 import FormField from '../components/FormField.tsx';
 import FormError from '../components/FormError.tsx';
 import { resetPasswordRequest } from '../services/authService.ts';
+import { getApiError } from '../lib/getApiError.ts';
 
 const resetPasswordSchema = z.object({
   password: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
@@ -34,11 +35,7 @@ export default function ResetPasswordPage() {
       const res = await resetPasswordRequest({ token, password: data.password });
       setMessage(res.data.message);
     } catch (err: unknown) {
-      const responseMessage =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setServerError(responseMessage || 'Không thể đặt lại mật khẩu');
+      setServerError(getApiError(err, 'Không thể đặt lại mật khẩu'));
     }
   };
 

@@ -35,26 +35,39 @@ export interface AdminReview {
   createdAt: string;
 }
 
+export interface PaginatedResponse<T> {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+  [key: string]: T[] | number;
+}
+
 export const fetchAdminStats = () => apiClient.get<AdminStats>('/admin/stats');
 
-export const fetchAdminUsers = () => apiClient.get<AdminUser[]>('/admin/users');
+export const fetchAdminUsers = (page = 1, limit = 20) =>
+  apiClient.get<{ users: AdminUser[] } & PaginatedResponse<AdminUser>>('/admin/users', { params: { page, limit } });
 
 export const updateAdminUserRole = (id: string, role: AdminUser['role']) =>
   apiClient.patch<AdminUser>(`/admin/users/${id}/role`, { role });
 
-export const fetchAdminListings = () => apiClient.get<Listing[]>('/admin/listings');
+export const fetchAdminListings = (page = 1, limit = 20) =>
+  apiClient.get<{ listings: Listing[] } & PaginatedResponse<Listing>>('/admin/listings', { params: { page, limit } });
 
 export const updateAdminListingStatus = (id: string, isActive: boolean) =>
   apiClient.patch<Listing>(`/admin/listings/${id}/status`, { isActive });
 
-export const fetchAdminBookings = () => apiClient.get<Booking[]>('/admin/bookings');
+export const fetchAdminBookings = (page = 1, limit = 20) =>
+  apiClient.get<{ bookings: Booking[] } & PaginatedResponse<Booking>>('/admin/bookings', { params: { page, limit } });
 
 export const cancelAdminBooking = (id: string) =>
   apiClient.patch<Booking>(`/admin/bookings/${id}/cancel`);
 
-export const fetchAdminReviews = () => apiClient.get<AdminReview[]>('/admin/reviews');
+export const fetchAdminReviews = (page = 1, limit = 20) =>
+  apiClient.get<{ reviews: AdminReview[] } & PaginatedResponse<AdminReview>>('/admin/reviews', { params: { page, limit } });
 
 export const deleteAdminReview = (id: string) =>
   apiClient.delete(`/admin/reviews/${id}`);
 
-export const fetchAdminMessages = () => apiClient.get<AdminMessage[]>('/admin/messages');
+export const fetchAdminMessages = (page = 1, limit = 20) =>
+  apiClient.get<{ messages: AdminMessage[] } & PaginatedResponse<AdminMessage>>('/admin/messages', { params: { page, limit } });
