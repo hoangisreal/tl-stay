@@ -28,6 +28,20 @@ const versionAtLeast = (version, major) => {
 };
 
 const npmVersion = () => {
+  const userAgent = process.env.npm_config_user_agent || '';
+  const userAgentMatch = userAgent.match(/npm\/(\d+\.\d+\.\d+)/);
+  if (userAgentMatch) {
+    return userAgentMatch[1];
+  }
+
+  const npmExecPath = process.env.npm_execpath;
+  if (npmExecPath) {
+    const result = spawnSync(process.execPath, [npmExecPath, '--version'], { encoding: 'utf8' });
+    if (result.status === 0) {
+      return result.stdout.trim();
+    }
+  }
+
   const cmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const result = spawnSync(cmd, ['--version'], { encoding: 'utf8' });
   return result.status === 0 ? result.stdout.trim() : '';

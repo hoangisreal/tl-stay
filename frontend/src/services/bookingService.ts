@@ -4,6 +4,8 @@ import type { Listing } from './listingService.ts';
 export interface PriceBreakdown {
   nights: number;
   subtotal: number;
+  specialOfferDiscount?: number;
+  monthlyDiscount?: number;
   cleaningFee: number;
   serviceFee: number;
   tax: number;

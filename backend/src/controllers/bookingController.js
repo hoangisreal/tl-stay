@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import Booking from '../models/Booking.js';
 import BookingHold from '../models/BookingHold.js';
 import Listing from '../models/Listing.js';
+import User from '../models/User.js';
 import PaymentEvent from '../models/PaymentEvent.js';
 import {
   enumerateStayNights,
@@ -10,8 +11,10 @@ import {
   validateListingAvailability,
 } from '../utils/availability.js';
 import { computeBreakdown } from '../utils/pricing.js';
+import { calculateRefund, canCancel } from '../utils/cancellation.js';
 import { dateOnlySchema, objectIdSchema, parseDateOnly, todayUtcDateOnly } from '../utils/validators.js';
 import { notifyBookingEvent } from '../utils/notifications.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 const bookingSchema = z.object({
   listing: objectIdSchema,
@@ -100,6 +103,11 @@ const applyPaymentEvent = async ({ paymentIntentId, type, eventId, payload }) =>
     booking.payment.status = 'paid';
     booking.payment.paidAt = new Date();
     await booking.save();
+    await logActivity(booking.guest?._id || booking.guest, 'payment.succeeded', 'booking', booking._id, {
+      paymentIntentId,
+      eventId,
+      amount: booking.totalPrice,
+    });
     await notifyBookingEvent({
       booking,
       listing: booking.listing,
@@ -115,6 +123,11 @@ const applyPaymentEvent = async ({ paymentIntentId, type, eventId, payload }) =>
     booking.payment.failedAt = new Date();
     await booking.save();
     await BookingHold.deleteMany({ booking: booking._id });
+    await logActivity(booking.guest?._id || booking.guest, 'payment.failed', 'booking', booking._id, {
+      paymentIntentId,
+      eventId,
+      amount: booking.totalPrice,
+    });
     await notifyBookingEvent({
       booking,
       listing: booking.listing,
@@ -163,6 +176,23 @@ export const create = async (req, res, next) => {
       res.status(400);
       return next(new Error('Listing is not available'));
     }
+    
+    // Check guest requirements
+    const guest = await User.findById(req.user._id);
+    const reqs = listing.guestRequirements;
+    if (reqs?.verifiedEmail && !guest.verified?.email) {
+      res.status(400);
+      return next(new Error('Email verification required'));
+    }
+    if (reqs?.verifiedPhone && !guest.verified?.phone) {
+      res.status(400);
+      return next(new Error('Phone verification required'));
+    }
+    if (reqs?.verifiedId && !guest.verified?.id) {
+      res.status(400);
+      return next(new Error('ID verification required'));
+    }
+    
     if (guests > listing.maxGuests) {
       res.status(400);
       return next(new Error(`Maximum ${listing.maxGuests} guests allowed`));
@@ -182,7 +212,8 @@ export const create = async (req, res, next) => {
       checkIn,
       checkOut,
       listing.pricePerNight,
-      listing.cleaningFee || 0
+      listing.cleaningFee || 0,
+      listing
     );
     const booking = new Booking({
       listing: listingId,
@@ -292,10 +323,11 @@ export const cancel = async (req, res, next) => {
         res.status(400);
         return next(new Error('Paid bookings can only be cancelled before check-in'));
       }
+      const { refundAmount } = calculateRefund(booking, listing);
       booking.status = 'refunded';
       booking.payment.status = 'refunded';
       booking.payment.refundedAt = new Date();
-      booking.payment.refundAmount = booking.totalPrice;
+      booking.payment.refundAmount = refundAmount;
     } else {
       booking.status = 'cancelled';
       booking.payment.status = 'cancelled';
@@ -304,6 +336,10 @@ export const cancel = async (req, res, next) => {
     await booking.save();
     await BookingHold.deleteMany({ booking: booking._id });
     const populated = await populateBooking(booking);
+    await logActivity(req.user._id, populated.status === 'refunded' ? 'booking.refunded' : 'booking.cancelled', 'booking', populated._id, {
+      status: populated.status,
+      paymentStatus: populated.payment?.status,
+    }, req);
     await notifyBookingEvent({
       booking: populated,
       listing: populated.listing,
@@ -326,7 +362,7 @@ export const quote = async (req, res, next) => {
     }
     const { listing: listingId, checkIn, checkOut } = parsed.data;
     const listing = await Listing.findById(listingId).select(
-      'pricePerNight cleaningFee isActive blockedDates minNights maxNights advanceNoticeDays maxAdvanceBookingDays checkInDays checkOutDays'
+      'pricePerNight cleaningFee isActive blockedDates minNights maxNights advanceNoticeDays maxAdvanceBookingDays checkInDays checkOutDays customPricing weekendPriceMultiplier monthlyDiscount specialOffers'
     );
     if (!listing) {
       res.status(404);
@@ -360,7 +396,7 @@ export const quote = async (req, res, next) => {
       res.status(409);
       return next(new Error('Dates are not available'));
     }
-    const breakdown = computeBreakdown(checkIn, checkOut, listing.pricePerNight, listing.cleaningFee || 0);
+    const breakdown = computeBreakdown(checkIn, checkOut, listing.pricePerNight, listing.cleaningFee || 0, listing);
     res.json(breakdown);
   } catch (err) {
     next(err);

@@ -1,0 +1,34 @@
+{
+  "auth": {
+    "loginSuccess": "Đăng nhập thành công",
+    "logoutSuccess": "Đăng xuất thành công",
+    "registerSuccess": "Đăng ký thành công",
+    "invalidCredentials": "Email hoặc mật khẩu không đúng",
+    "emailExists": "Email đã được sử dụng",
+    "unauthorized": "Vui lòng đăng nhập",
+    "accessDenied": "Bạn không có quyền truy cập"
+  },
+  "booking": {
+    "created": "Đặt phòng thành công",
+    "cancelled": "Đã hủy đặt phòng",
+    "notAvailable": "Phòng không khả dụng trong thời gian này",
+    "notFound": "Không tìm thấy đặt phòng"
+  },
+  "listing": {
+    "created": "Tạo listing thành công",
+    "updated": "Cập nhật listing thành công",
+    "deleted": "Xóa listing thành công",
+    "notFound": "Không tìm thấy listing"
+  },
+  "review": {
+    "created": "Đánh giá thành công",
+    "deleted": "Xóa đánh giá thành công",
+    "alreadyReviewed": "Bạn đã đánh giá booking này"
+  },
+  "validation": {
+    "required": "Trường này là bắt buộc",
+    "invalidEmail": "Email không hợp lệ",
+    "minLength": "Tối thiểu {{min}} ký tự",
+    "maxLength": "Tối đa {{max}} ký tự"
+  }
+}

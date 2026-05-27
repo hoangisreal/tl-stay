@@ -10,7 +10,10 @@ import Review from '../models/Review.js';
 import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
 import PasswordResetToken from '../models/PasswordResetToken.js';
-import { enumerateStayNights } from './availability.js';
+import PaymentEvent from '../models/PaymentEvent.js';
+import Notification from '../models/Notification.js';
+import ActivityLog from '../models/ActivityLog.js';
+import { enumerateStayNights, ACTIVE_BOOKING_STATUSES, PAID_BOOKING_STATUSES } from './availability.js';
 import { computeBreakdown } from './pricing.js';
 
 const daysFromNow = (n) => {
@@ -43,24 +46,37 @@ const cityCoordinates = {
   'Sơn La': { lat: 21.328, lng: 103.914 },
 };
 
-const demoUsers = [
+export const demoUsers = [
+  // Admin
   { key: 'admin', name: 'TL-Stay Admin', email: 'admin@tlstay.com', role: 'admin' },
+  
+  // Staff roles
+  { key: 'supportHung', name: 'Nguyễn Văn Hùng', email: 'hung.support@tlstay.com', role: 'customer_support' },
+  { key: 'supportThao', name: 'Lê Thị Thảo', email: 'thao.support@tlstay.com', role: 'customer_support' },
+  { key: 'moderatorQuang', name: 'Trần Quang', email: 'quang.moderator@tlstay.com', role: 'content_moderator' },
+  { key: 'moderatorNhi', name: 'Phạm Như Nhi', email: 'nhi.moderator@tlstay.com', role: 'content_moderator' },
+  { key: 'financeManager', name: 'Hoàng Tài', email: 'tai.finance@tlstay.com', role: 'finance_manager' },
+  { key: 'operationsManager', name: 'Vũ Đức', email: 'duc.operations@tlstay.com', role: 'operations_manager' },
+  
+  // Hosts
   { key: 'hostMinh', name: 'Nguyễn Minh', email: 'host@tlstay.com', role: 'host' },
   { key: 'hostLan', name: 'Trần Thị Lan', email: 'lan.host@tlstay.com', role: 'host' },
   { key: 'hostTuan', name: 'Phạm Tuấn', email: 'tuan.host@tlstay.com', role: 'host' },
   { key: 'hostMai', name: 'Hoàng Mai', email: 'mai.host@tlstay.com', role: 'host' },
   { key: 'hostSon', name: 'Lê Sơn', email: 'son.host@tlstay.com', role: 'host' },
-  { key: 'guestAn', name: 'Lê Hoàng An', email: 'guest@tlstay.com', role: 'guest' },
+  
+  // Guests
+  { key: 'guestAn', name: 'Lê Hoàng An', email: 'guest@tlstay.com', role: 'guest', verified: { email: true, phone: true, id: true } },
   { key: 'guestBinh', name: 'Đỗ Thanh Bình', email: 'binh.guest@tlstay.com', role: 'guest' },
-  { key: 'guestChi', name: 'Vũ Linh Chi', email: 'chi.guest@tlstay.com', role: 'guest' },
+  { key: 'guestChi', name: 'Vũ Linh Chi', email: 'chi.guest@tlstay.com', role: 'guest', verified: { email: true, phone: false, id: false } },
   { key: 'guestDung', name: 'Nguyễn Quốc Dũng', email: 'dung.guest@tlstay.com', role: 'guest' },
   { key: 'guestHa', name: 'Phạm Thu Hà', email: 'ha.guest@tlstay.com', role: 'guest' },
-  { key: 'guestKhoa', name: 'Trần Minh Khoa', email: 'khoa.guest@tlstay.com', role: 'guest' },
+  { key: 'guestKhoa', name: 'Trần Minh Khoa', email: 'khoa.guest@tlstay.com', role: 'guest', verified: { email: true, phone: true, id: false } },
   { key: 'guestLinh', name: 'Mai Khánh Linh', email: 'linh.guest@tlstay.com', role: 'guest' },
   { key: 'guestNam', name: 'Bùi Hải Nam', email: 'nam.guest@tlstay.com', role: 'guest' },
 ];
 
-const demoListings = [
+export const demoListings = [
   {
     host: 'hostMinh',
     category: 'beach',
@@ -481,13 +497,13 @@ const demoListings = [
   },
 ];
 
-const bookingSpecs = [
-  ['Căn hộ view biển Đà Nẵng', 'guestAn', 5, 8, 2, 'confirmed'],
+export const bookingSpecs = [
+  ['Căn hộ view biển Đà Nẵng', 'guestAn', 5, 8, 2, 'paid'],
   ['Villa hồ bơi riêng', 'guestAn', 20, 23, 6, 'confirmed'],
-  ['Homestay phố cổ Hội An', 'guestBinh', 2, 4, 2, 'confirmed'],
+  ['Homestay phố cổ Hội An', 'guestBinh', 2, 4, 2, 'unpaid'],
   ['Villa thông Đà Lạt', 'guestBinh', 14, 17, 4, 'pending'],
-  ['Studio gần Hồ Tây', 'guestChi', 7, 10, 2, 'confirmed'],
-  ['Bungalow ven biển Phú Quốc', 'guestChi', 30, 34, 2, 'confirmed'],
+  ['Studio gần Hồ Tây', 'guestChi', 7, 10, 2, 'failed'],
+  ['Bungalow ven biển Phú Quốc', 'guestChi', 30, 34, 2, 'refunded'],
   ['Apartment cao cấp Landmark 81', 'guestDung', 40, 43, 4, 'cancelled'],
   ['Cabin Sa Pa', 'guestHa', 9, 12, 2, 'confirmed'],
   ['Nhà vườn An Bàng', 'guestKhoa', 18, 21, 3, 'confirmed'],
@@ -687,15 +703,33 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
       Conversation.deleteMany({}),
       Message.deleteMany({}),
       PasswordResetToken.deleteMany({}),
+      PaymentEvent.deleteMany({}),
+      Notification.deleteMany({}),
+      ActivityLog.deleteMany({}),
     ]);
   }
 
   const passwordHash = await bcrypt.hash('password123', 10);
-  const users = await User.insertMany(demoUsers.map(({ key, ...user }) => ({ ...user, passwordHash })));
+  const users = await User.insertMany(
+    demoUsers.map(({ key, ...user }) => ({
+      ...user,
+      passwordHash,
+      phone: user.role === 'host' ? '+84912345678' : '',
+      verified: user.verified || {
+        email: user.role !== 'guest',
+        phone: user.role === 'host',
+        id: user.role === 'host',
+      },
+      preferences: {
+        language: 'vi',
+        currency: 'VND',
+      },
+    }))
+  );
   const userByKey = Object.fromEntries(demoUsers.map((user, index) => [user.key, users[index]]));
 
   const listings = await Listing.insertMany(
-    demoListings.map(({ host, ...listing }) => ({
+    demoListings.map(({ host, ...listing }, idx) => ({
       ...listing,
       host: userByKey[host]._id,
       location: {
@@ -703,6 +737,17 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
         ...(cityCoordinates[listing.location.city] || {}),
       },
       isActive: listing.isActive ?? true,
+      cancellationPolicy: idx % 3 === 0 ? 'flexible' : idx % 3 === 1 ? 'moderate' : 'strict',
+      weekendPriceMultiplier: listing.pricePerNight > 1000000 ? 1.2 : 1,
+      monthlyDiscount: listing.pricePerNight > 500000 ? 10 : 5,
+      guestRequirements: idx < 5 ? { verifiedEmail: true, verifiedPhone: false, verifiedId: false } : {},
+      specialOffers: idx === 0 ? [{
+        name: 'Early Bird',
+        discountPercentage: 15,
+        validFrom: new Date(),
+        validTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        minNights: 3,
+      }] : [],
     }))
   );
   const findListing = (titleStart) => {
@@ -711,13 +756,39 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
     return listing;
   };
 
-  const buildBooking = ([titleStart, guestKey, checkInOffset, checkOutOffset, guests, status]) => {
+  const paymentForStatus = (status, totalPrice, index) => {
+    const intentId = `pi_seed_${String(index + 1).padStart(3, '0')}_${status}`;
+    const base = {
+      provider: 'mock',
+      intentId,
+      amount: totalPrice,
+      currency: 'VND',
+      checkoutUrl: `http://localhost:5173/bookings/seed-${index + 1}/confirmation?payment_intent=${intentId}`,
+      dueAt: daysFromNow(1),
+    };
+    if (['paid', 'confirmed'].includes(status)) {
+      return { ...base, status: 'paid', paidAt: daysFromNow(-1) };
+    }
+    if (status === 'refunded') {
+      return { ...base, status: 'refunded', paidAt: daysFromNow(-5), refundedAt: daysFromNow(-1), refundAmount: totalPrice };
+    }
+    if (status === 'failed') {
+      return { ...base, status: 'failed', failedAt: daysFromNow(-1) };
+    }
+    if (status === 'cancelled') {
+      return { ...base, status: 'cancelled' };
+    }
+    return { ...base, status: 'requires_payment' };
+  };
+
+  const buildBooking = ([titleStart, guestKey, checkInOffset, checkOutOffset, guests, status], index) => {
     const listing = findListing(titleStart);
     const breakdown = computeBreakdown(
       daysFromNow(checkInOffset),
       daysFromNow(checkOutOffset),
       listing.pricePerNight,
-      listing.cleaningFee
+      listing.cleaningFee,
+      listing
     );
     return {
       listing: listing._id,
@@ -727,12 +798,55 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
       guests,
       status,
       ...breakdown,
+      payment: paymentForStatus(status, breakdown.totalPrice, index),
     };
   };
 
   const bookings = await Booking.insertMany(bookingSpecs.map(buildBooking));
+  const listingById = Object.fromEntries(listings.map((listing) => [listing._id.toString(), listing]));
+  const notificationTypeForStatus = (status) => {
+    if (['paid', 'confirmed'].includes(status)) return 'booking_paid';
+    if (status === 'cancelled') return 'booking_cancelled';
+    if (status === 'refunded') return 'booking_refunded';
+    if (status === 'failed') return 'booking_failed';
+    return 'booking_created';
+  };
+  const notificationTitleForType = {
+    booking_created: 'Đặt phòng đang chờ thanh toán',
+    booking_paid: 'Đặt phòng đã thanh toán',
+    booking_cancelled: 'Đặt phòng đã huỷ',
+    booking_refunded: 'Đặt phòng đã hoàn tiền',
+    booking_failed: 'Thanh toán đặt phòng thất bại',
+  };
+  const notifications = bookings.flatMap((booking, index) => {
+    const listing = listingById[booking.listing.toString()];
+    const type = notificationTypeForStatus(booking.status);
+    const title = notificationTitleForType[type];
+    const readAt = index % 3 === 0 ? daysFromNow(-1) : null;
+    const base = {
+      type,
+      booking: booking._id,
+      listing: booking.listing,
+      readAt,
+    };
+    return [
+      {
+        ...base,
+        user: booking.guest,
+        title,
+        body: `${title} cho ${listing?.title || 'phòng đã chọn'}.`,
+      },
+      {
+        ...base,
+        user: listing?.host,
+        title: `Cập nhật ${listing?.title || 'listing'}`,
+        body: `Booking của khách có trạng thái ${booking.status}.`,
+      },
+    ].filter((item) => item.user);
+  });
+  if (notifications.length) await Notification.insertMany(notifications);
   const holds = bookings
-    .filter((booking) => booking.status !== 'cancelled')
+    .filter((booking) => ACTIVE_BOOKING_STATUSES.includes(booking.status))
     .flatMap((booking) =>
       enumerateStayNights(booking.checkIn, booking.checkOut).map((date) => ({
         listing: booking.listing,
@@ -742,7 +856,7 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
     );
   if (holds.length) await BookingHold.insertMany(holds);
 
-  const pastBookings = bookings.filter((booking) => booking.status !== 'cancelled' && booking.checkOut < new Date());
+  const pastBookings = bookings.filter((booking) => PAID_BOOKING_STATUSES.includes(booking.status) && booking.checkOut < new Date());
   const reviews = pastBookings.slice(0, 24).map((booking, index) => {
     const template = reviewTemplates[index % reviewTemplates.length];
     return {
@@ -809,6 +923,79 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
   });
   if (conversationMessages.length) await Message.insertMany(conversationMessages);
 
+  const [firstListing, secondListing] = listings;
+  const paidBooking = bookings.find((booking) => booking.status === 'paid') || bookings[0];
+  const cancelledBooking = bookings.find((booking) => booking.status === 'cancelled') || bookings[0];
+  const failedBooking = bookings.find((booking) => booking.status === 'failed') || bookings[0];
+  const firstReview = await Review.findOne();
+  const firstMessage = await Message.findOne();
+  const activityLogs = [
+    {
+      user: userByKey.admin._id,
+      action: 'user.role_updated',
+      resource: 'user',
+      resourceId: userByKey.supportHung._id,
+      details: { role: 'customer_support', source: 'demo_seed' },
+    },
+    {
+      user: userByKey.operationsManager._id,
+      action: 'user.verified',
+      resource: 'user',
+      resourceId: userByKey.guestAn._id,
+      details: { verified: userByKey.guestAn.verified, source: 'demo_seed' },
+    },
+    {
+      user: userByKey.moderatorQuang._id,
+      action: 'listing.status_updated',
+      resource: 'listing',
+      resourceId: secondListing._id,
+      details: { isActive: secondListing.isActive, source: 'demo_seed' },
+    },
+    {
+      user: userByKey.supportHung._id,
+      action: 'booking.cancelled',
+      resource: 'booking',
+      resourceId: cancelledBooking._id,
+      details: { status: cancelledBooking.status, source: 'demo_seed' },
+    },
+    {
+      user: userByKey.guestAn._id,
+      action: 'payment.succeeded',
+      resource: 'booking',
+      resourceId: paidBooking._id,
+      details: { paymentStatus: paidBooking.payment.status, source: 'demo_seed' },
+    },
+    {
+      user: userByKey.moderatorNhi._id,
+      action: 'review.deleted',
+      resource: 'review',
+      resourceId: firstReview?._id,
+      details: { demoOnly: true, source: 'demo_seed' },
+    },
+    {
+      user: userByKey.hostMinh._id,
+      action: 'listing.updated',
+      resource: 'listing',
+      resourceId: firstListing._id,
+      details: { title: firstListing.title, source: 'demo_seed' },
+    },
+    {
+      user: userByKey.guestAn._id,
+      action: 'message.sent',
+      resource: 'message',
+      resourceId: firstMessage?._id,
+      details: { source: 'demo_seed' },
+    },
+    {
+      user: userByKey.guestChi._id,
+      action: 'payment.failed',
+      resource: 'booking',
+      resourceId: failedBooking._id,
+      details: { source: 'demo_seed' },
+    },
+  ].filter((logItem) => logItem.resourceId);
+  await ActivityLog.insertMany(activityLogs);
+
   if (log) {
     console.log('Seed completed.');
     console.log(`  Users:    ${await User.countDocuments()}`);
@@ -817,9 +1004,17 @@ export const seedDemoData = async ({ reset = true, log = true } = {}) => {
     console.log(`  Bookings: ${await Booking.countDocuments()}`);
     console.log(`  Reviews:  ${await Review.countDocuments()}`);
     console.log(`  Chats:    ${await Conversation.countDocuments()} conversations, ${await Message.countDocuments()} messages`);
+    console.log(`  Notices:  ${await Notification.countDocuments()} notifications`);
+    console.log(`  Activity: ${await ActivityLog.countDocuments()} logs`);
     console.log('');
     console.log('Demo accounts (password: password123):');
     console.log('  Admin: admin@tlstay.com');
+    console.log('  Staff: hung.support@tlstay.com  (Customer Support)');
+    console.log('  Staff: thao.support@tlstay.com  (Customer Support)');
+    console.log('  Staff: quang.moderator@tlstay.com  (Content Moderator)');
+    console.log('  Staff: nhi.moderator@tlstay.com  (Content Moderator)');
+    console.log('  Staff: tai.finance@tlstay.com  (Finance Manager)');
+    console.log('  Staff: duc.operations@tlstay.com  (Operations Manager)');
     console.log('  Host:  host@tlstay.com  (Nguyễn Minh)');
     console.log('  Host:  lan.host@tlstay.com  (Trần Thị Lan)');
     console.log('  Host:  tuan.host@tlstay.com  (Phạm Tuấn)');

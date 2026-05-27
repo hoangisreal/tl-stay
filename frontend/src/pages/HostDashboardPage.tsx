@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react';
 import { fetchMyListings, createListing, updateListing, deleteListing, type Listing } from '../services/listingService.ts';
+import { fetchHostAnalytics, type HostAnalytics } from '../services/analyticsService.ts';
 import ListingForm from '../components/ListingForm.tsx';
 import { resolveFirstImage } from '../lib/images.ts';
 
 export default function HostDashboardPage() {
   const [listings, setListings] = useState<Listing[]>([]);
+  const [analytics, setAnalytics] = useState<HostAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Listing | null>(null);
 
   const loadListings = () => {
-    fetchMyListings().then((res) => setListings(res.data)).finally(() => setLoading(false));
+    Promise.all([
+      fetchMyListings(),
+      fetchHostAnalytics().catch(() => ({ data: null })),
+    ]).then(([listingRes, analyticsRes]) => {
+      setListings(listingRes.data);
+      setAnalytics(analyticsRes.data);
+    }).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadListings(); }, []);
@@ -58,6 +66,27 @@ export default function HostDashboardPage() {
           + Thêm phòng
         </button>
       </div>
+
+      {analytics && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs font-semibold uppercase text-gray-500">Phòng active</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.listings}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs font-semibold uppercase text-gray-500">Đặt phòng</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.bookings}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs font-semibold uppercase text-gray-500">Doanh thu</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.revenue.toLocaleString('vi-VN')}đ</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <p className="text-xs font-semibold uppercase text-gray-500">Đánh giá</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.avgRating.toFixed(1)}/5</p>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-gray-500 text-sm">Đang tải...</p>

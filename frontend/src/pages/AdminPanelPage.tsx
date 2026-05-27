@@ -11,6 +11,7 @@ import {
   fetchAdminUsers,
   updateAdminListingStatus,
   updateAdminUserRole,
+  verifyAdminUser,
   type AdminReview,
   type AdminStats,
   type AdminUser,
@@ -18,30 +19,38 @@ import {
 import type { Booking } from '../services/bookingService.ts';
 import type { AdminMessage } from '../services/conversationService.ts';
 import type { Listing } from '../services/listingService.ts';
+import useAuth from '../hooks/useAuth.ts';
+import { hasPermission } from '../lib/permissions.ts';
+import VerifiedBadge from '../components/VerifiedBadge.tsx';
 
 type TabKey = 'users' | 'listings' | 'bookings' | 'reviews' | 'messages';
 
-const tabs: { key: TabKey; label: string }[] = [
-  { key: 'users', label: 'Người dùng' },
-  { key: 'listings', label: 'Phòng' },
-  { key: 'bookings', label: 'Đặt phòng' },
-  { key: 'reviews', label: 'Đánh giá' },
-  { key: 'messages', label: 'Tin nhắn' },
+const tabs: { key: TabKey; label: string; permission: string }[] = [
+  { key: 'users', label: 'Người dùng', permission: 'users:read' },
+  { key: 'listings', label: 'Phòng', permission: 'listings:read' },
+  { key: 'bookings', label: 'Đặt phòng', permission: 'bookings:read' },
+  { key: 'reviews', label: 'Đánh giá', permission: 'reviews:read' },
+  { key: 'messages', label: 'Tin nhắn', permission: 'messages:read' },
 ];
 
 const roleLabels = {
   guest: 'Khách',
   host: 'Chủ nhà',
   admin: 'Admin',
+  customer_support: 'Hỗ trợ khách hàng',
+  content_moderator: 'Kiểm duyệt nội dung',
+  finance_manager: 'Quản lý tài chính',
+  operations_manager: 'Quản lý vận hành',
 };
 
 const fmtMoney = (value: number) => `${value.toLocaleString('vi-VN')}đ`;
 const fmtDate = (value: string) => new Date(value).toLocaleDateString('vi-VN');
 
-export default function AdminPanelPage() {
+export default function AdminPanelPage({ staffMode = false }: { staffMode?: boolean } = {}) {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('users');
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Per-tab state: data is null until the tab is first visited
   const [users, setUsers] = useState<AdminUser[] | null>(null);
@@ -56,8 +65,21 @@ export default function AdminPanelPage() {
 
   // Track which tabs have been loaded so we don't refetch unless refresh is clicked
   const loadedTabs = useRef<Set<TabKey>>(new Set());
+  const visibleTabs = useMemo(() => tabs.filter((tab) => hasPermission(user, tab.permission)), [user]);
+  const resolvedActiveTab = visibleTabs.some((tab) => tab.key === activeTab) ? activeTab : visibleTabs[0]?.key;
+  const canViewStats = hasPermission(user, 'analytics:read');
+  const canManageRoles = hasPermission(user, 'users:role');
+  const canVerifyUsers = hasPermission(user, 'users:verify');
+  const canUpdateListings = hasPermission(user, 'listings:update');
+  const canUpdateBookings = hasPermission(user, 'bookings:update');
+  const canDeleteReviews = hasPermission(user, 'reviews:delete');
 
   const loadStats = async () => {
+    if (!canViewStats) {
+      setStats(null);
+      setStatsLoading(false);
+      return;
+    }
     setStatsLoading(true);
     try {
       const res = await fetchAdminStats();
@@ -70,6 +92,8 @@ export default function AdminPanelPage() {
   };
 
   const loadTab = async (tab: TabKey, force = false) => {
+    const tabConfig = tabs.find((item) => item.key === tab);
+    if (!tabConfig || !hasPermission(user, tabConfig.permission)) return;
     if (!force && loadedTabs.current.has(tab)) return;
     setTabLoading(true);
     setError('');
@@ -111,14 +135,25 @@ export default function AdminPanelPage() {
 
   const handleRefresh = async () => {
     loadedTabs.current.clear();
-    await Promise.all([loadStats(), loadTab(activeTab, true)]);
+    await Promise.all([
+      canViewStats ? loadStats() : Promise.resolve(),
+      resolvedActiveTab ? loadTab(resolvedActiveTab, true) : Promise.resolve(),
+    ]);
   };
 
-  // Load stats once on mount and load the initial (users) tab
+  useEffect(() => {
+    if (resolvedActiveTab && resolvedActiveTab !== activeTab) {
+      setActiveTab(resolvedActiveTab);
+    }
+  }, [activeTab, resolvedActiveTab]);
+
   useEffect(() => {
     loadStats();
-    loadTab('users');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [canViewStats]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (resolvedActiveTab) loadTab(resolvedActiveTab);
+  }, [resolvedActiveTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab);
@@ -137,6 +172,7 @@ export default function AdminPanelPage() {
   }, [stats]);
 
   const changeRole = async (userId: string, role: AdminUser['role']) => {
+    if (!canManageRoles) return;
     setBusyId(userId);
     try {
       const { data } = await updateAdminUserRole(userId, role);
@@ -146,7 +182,19 @@ export default function AdminPanelPage() {
     }
   };
 
+  const verifyUser = async (userId: string) => {
+    if (!canVerifyUsers) return;
+    setBusyId(userId);
+    try {
+      const { data } = await verifyAdminUser(userId, { email: true, phone: true, id: true });
+      setUsers((prev) => prev ? prev.map((u) => (u._id === userId ? data.user : u)) : prev);
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const changeListingStatus = async (listingId: string, isActive: boolean) => {
+    if (!canUpdateListings) return;
     setBusyId(listingId);
     try {
       const { data } = await updateAdminListingStatus(listingId, isActive);
@@ -166,6 +214,7 @@ export default function AdminPanelPage() {
   };
 
   const cancelBooking = async (bookingId: string) => {
+    if (!canUpdateBookings) return;
     if (!confirm('Huỷ đặt phòng này?')) return;
     setBusyId(bookingId);
     try {
@@ -177,6 +226,7 @@ export default function AdminPanelPage() {
   };
 
   const removeReview = async (reviewId: string) => {
+    if (!canDeleteReviews) return;
     if (!confirm('Xoá đánh giá này?')) return;
     setBusyId(reviewId);
     try {
@@ -189,13 +239,26 @@ export default function AdminPanelPage() {
   };
 
   if (statsLoading) return <div className="flex justify-center py-20">Đang tải...</div>;
+  if (!user) return null;
+  if (!resolvedActiveTab) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-16 text-center text-gray-500">
+        Tài khoản này chưa có quyền truy cập bảng điều khiển.
+      </div>
+    );
+  }
+
+  const title = user.role === 'admin' && !staffMode ? 'Admin Panel' : 'Bảng điều khiển nhân viên';
+  const subtitle = user.role === 'admin'
+    ? 'Quản lý dữ liệu, thống kê và phân quyền hệ thống.'
+    : roleLabels[user.role] || 'Nhân viên TL-Stay';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-          <p className="text-sm text-gray-500">Quản lý dữ liệu, thống kê và phân quyền hệ thống.</p>
+          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+          <p className="text-sm text-gray-500">{subtitle}</p>
         </div>
         <button
           onClick={handleRefresh}
@@ -211,24 +274,26 @@ export default function AdminPanelPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        {statCards.map((card) => (
-          <div key={card.label} className="bg-white border border-gray-200 rounded-lg p-4">
-            <p className="text-xs font-semibold uppercase text-gray-500">{card.label}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{card.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{card.sub}</p>
-          </div>
-        ))}
-      </div>
+      {canViewStats && stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {statCards.map((card) => (
+            <div key={card.label} className="bg-white border border-gray-200 rounded-lg p-4">
+              <p className="text-xs font-semibold uppercase text-gray-500">{card.label}</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{card.value}</p>
+              <p className="text-xs text-gray-500 mt-1">{card.sub}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="border-b border-gray-200 overflow-x-auto">
         <div className="flex min-w-max gap-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => handleTabChange(tab.key)}
               className={`px-4 py-3 text-sm font-medium border-b-2 ${
-                activeTab === tab.key
+                resolvedActiveTab === tab.key
                   ? 'border-rose-500 text-rose-600'
                   : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
@@ -241,14 +306,16 @@ export default function AdminPanelPage() {
 
       {tabLoading && <div className="text-sm text-gray-500 py-4 text-center">Đang tải...</div>}
 
-      {!tabLoading && activeTab === 'users' && users !== null && (
+      {!tabLoading && resolvedActiveTab === 'users' && users !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>
               <Th>Tên</Th>
               <Th>Email</Th>
               <Th>Quyền</Th>
+              <Th>Xác thực</Th>
               <Th>Ngày tạo</Th>
+              {canVerifyUsers && <Th>Thao tác</Th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
@@ -257,25 +324,45 @@ export default function AdminPanelPage() {
                 <Td>{user.name}</Td>
                 <Td>{user.email}</Td>
                 <Td>
-                  <select
-                    value={user.role}
-                    disabled={busyId === user._id}
-                    onChange={(e) => changeRole(user._id, e.target.value as AdminUser['role'])}
-                    className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
-                  >
-                    {(['guest', 'host', 'admin'] as const).map((role) => (
-                      <option key={role} value={role}>{roleLabels[role]}</option>
-                    ))}
-                  </select>
+                  {canManageRoles ? (
+                    <select
+                      value={user.role}
+                      disabled={busyId === user._id}
+                      onChange={(e) => changeRole(user._id, e.target.value as AdminUser['role'])}
+                      className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm"
+                    >
+                      {(['guest', 'host', 'admin', 'customer_support', 'content_moderator', 'finance_manager', 'operations_manager'] as const).map((role) => (
+                        <option key={role} value={role}>{roleLabels[role]}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    roleLabels[user.role]
+                  )}
                 </Td>
+                <Td><VerifiedBadge verified={user.verified} /></Td>
                 <Td>{fmtDate(user.createdAt)}</Td>
+                {canVerifyUsers && (
+                  <Td>
+                    {user.verified?.email && user.verified?.phone && user.verified?.id ? (
+                      <span className="text-xs text-gray-400">Đã đủ</span>
+                    ) : (
+                      <button
+                        disabled={busyId === user._id}
+                        onClick={() => verifyUser(user._id)}
+                        className="border border-blue-200 text-blue-700 rounded-lg px-3 py-1.5 text-sm hover:bg-blue-50 disabled:opacity-60"
+                      >
+                        Xác thực
+                      </button>
+                    )}
+                  </Td>
+                )}
               </tr>
             ))}
           </tbody>
         </AdminTable>
       )}
 
-      {!tabLoading && activeTab === 'listings' && listings !== null && (
+      {!tabLoading && resolvedActiveTab === 'listings' && listings !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>
@@ -283,7 +370,7 @@ export default function AdminPanelPage() {
               <Th>Host</Th>
               <Th>Giá</Th>
               <Th>Trạng thái</Th>
-              <Th>Thao tác</Th>
+              {canUpdateListings && <Th>Thao tác</Th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
@@ -296,22 +383,24 @@ export default function AdminPanelPage() {
                 <Td>{listing.host.name}</Td>
                 <Td>{fmtMoney(listing.pricePerNight)}</Td>
                 <Td>{listing.isActive ? 'Đang hiển thị' : 'Tạm ẩn'}</Td>
-                <Td>
-                  <button
-                    disabled={busyId === listing._id}
-                    onClick={() => changeListingStatus(listing._id, !listing.isActive)}
-                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-60"
-                  >
-                    {listing.isActive ? 'Tạm ẩn' : 'Hiển thị'}
-                  </button>
-                </Td>
+                {canUpdateListings && (
+                  <Td>
+                    <button
+                      disabled={busyId === listing._id}
+                      onClick={() => changeListingStatus(listing._id, !listing.isActive)}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-60"
+                    >
+                      {listing.isActive ? 'Tạm ẩn' : 'Hiển thị'}
+                    </button>
+                  </Td>
+                )}
               </tr>
             ))}
           </tbody>
         </AdminTable>
       )}
 
-      {!tabLoading && activeTab === 'bookings' && bookings !== null && (
+      {!tabLoading && resolvedActiveTab === 'bookings' && bookings !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>
@@ -320,7 +409,7 @@ export default function AdminPanelPage() {
               <Th>Ngày</Th>
               <Th>Tổng</Th>
               <Th>Trạng thái</Th>
-              <Th>Thao tác</Th>
+              {canUpdateBookings && <Th>Thao tác</Th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
@@ -334,24 +423,26 @@ export default function AdminPanelPage() {
                 <Td>{fmtDate(booking.checkIn)} - {fmtDate(booking.checkOut)}</Td>
                 <Td>{fmtMoney(booking.totalPrice)}</Td>
                 <Td><Badge status={booking.status} /></Td>
-                <Td>
-                  {!['cancelled', 'refunded', 'failed'].includes(booking.status) && (
-                    <button
-                      disabled={busyId === booking._id}
-                      onClick={() => cancelBooking(booking._id)}
-                      className="border border-red-200 text-red-600 rounded-lg px-3 py-1.5 text-sm hover:bg-red-50 disabled:opacity-60"
-                    >
-                      Huỷ
-                    </button>
-                  )}
-                </Td>
+                {canUpdateBookings && (
+                  <Td>
+                    {!['cancelled', 'refunded', 'failed'].includes(booking.status) && (
+                      <button
+                        disabled={busyId === booking._id}
+                        onClick={() => cancelBooking(booking._id)}
+                        className="border border-red-200 text-red-600 rounded-lg px-3 py-1.5 text-sm hover:bg-red-50 disabled:opacity-60"
+                      >
+                        Huỷ
+                      </button>
+                    )}
+                  </Td>
+                )}
               </tr>
             ))}
           </tbody>
         </AdminTable>
       )}
 
-      {!tabLoading && activeTab === 'reviews' && reviews !== null && (
+      {!tabLoading && resolvedActiveTab === 'reviews' && reviews !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>
@@ -359,7 +450,7 @@ export default function AdminPanelPage() {
               <Th>Khách</Th>
               <Th>Điểm</Th>
               <Th>Nội dung</Th>
-              <Th>Thao tác</Th>
+              {canDeleteReviews && <Th>Thao tác</Th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
@@ -374,22 +465,24 @@ export default function AdminPanelPage() {
                 <Td>
                   <p className="max-w-md text-sm line-clamp-2">{review.comment}</p>
                 </Td>
-                <Td>
-                  <button
-                    disabled={busyId === review._id}
-                    onClick={() => removeReview(review._id)}
-                    className="border border-red-200 text-red-600 rounded-lg px-3 py-1.5 text-sm hover:bg-red-50 disabled:opacity-60"
-                  >
-                    Xoá
-                  </button>
-                </Td>
+                {canDeleteReviews && (
+                  <Td>
+                    <button
+                      disabled={busyId === review._id}
+                      onClick={() => removeReview(review._id)}
+                      className="border border-red-200 text-red-600 rounded-lg px-3 py-1.5 text-sm hover:bg-red-50 disabled:opacity-60"
+                    >
+                      Xoá
+                    </button>
+                  </Td>
+                )}
               </tr>
             ))}
           </tbody>
         </AdminTable>
       )}
 
-      {!tabLoading && activeTab === 'messages' && messages !== null && (
+      {!tabLoading && resolvedActiveTab === 'messages' && messages !== null && (
         <AdminTable>
           <thead className="bg-gray-50">
             <tr>

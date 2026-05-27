@@ -17,8 +17,13 @@ import AdminPanelPage from '../pages/AdminPanelPage.tsx';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage.tsx';
 import ResetPasswordPage from '../pages/ResetPasswordPage.tsx';
 import ChangePasswordPage from '../pages/ChangePasswordPage.tsx';
+import AccountProfilePage from '../pages/AccountProfilePage.tsx';
+import NotificationsPage from '../pages/NotificationsPage.tsx';
 import MessagesPage from '../pages/MessagesPage.tsx';
 import ConversationPage from '../pages/ConversationPage.tsx';
+import StaffDashboard from '../components/StaffDashboard.tsx';
+import AnalyticsDashboard from '../components/AnalyticsDashboard.tsx';
+import ActivityLogViewer from '../components/ActivityLogViewer.tsx';
 
 export default function AppRouter() {
   return (
@@ -68,6 +73,22 @@ export default function AppRouter() {
             }
           />
           <Route
+            path="/account/profile"
+            element={
+              <ProtectedRoute>
+                <AccountProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/host/dashboard"
             element={
               <RoleRoute role="host">
@@ -88,6 +109,30 @@ export default function AppRouter() {
             element={
               <RoleRoute role="admin">
                 <AdminPanelPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/staff"
+            element={
+              <RoleRoute roles={['customer_support', 'content_moderator', 'finance_manager', 'operations_manager']}>
+                <StaffDashboard />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <RoleRoute roles={['admin', 'finance_manager', 'operations_manager']}>
+                <AnalyticsDashboard />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/activity-logs"
+            element={
+              <RoleRoute role="admin">
+                <ActivityLogViewer />
               </RoleRoute>
             }
           />

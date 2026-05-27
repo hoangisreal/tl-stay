@@ -57,6 +57,19 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
     ...(availability?.blockedDates || []),
     ...(availability?.bookedRanges || []).flatMap((range) => enumerateDates(dateOnly(range.checkIn), dateOnly(range.checkOut))),
   ]);
+  const guestRequirements = listing.guestRequirements || {};
+  const requirementLabels = [
+    guestRequirements.verifiedEmail ? 'email đã xác thực' : '',
+    guestRequirements.verifiedPhone ? 'số điện thoại đã xác thực' : '',
+    guestRequirements.verifiedId ? 'giấy tờ tùy thân đã xác thực' : '',
+  ].filter(Boolean);
+  const missingRequirements = user
+    ? [
+        guestRequirements.verifiedEmail && !user.verified?.email ? 'email' : '',
+        guestRequirements.verifiedPhone && !user.verified?.phone ? 'số điện thoại' : '',
+        guestRequirements.verifiedId && !user.verified?.id ? 'giấy tờ tùy thân' : '',
+      ].filter(Boolean)
+    : [];
 
   const minCheckIn = availability ? addDays(today, availability.rules.advanceNoticeDays) : today;
   const maxCheckIn = availability ? addDays(today, availability.rules.maxAdvanceBookingDays) : undefined;
@@ -181,6 +194,14 @@ export default function BookingWidget({ listing }: BookingWidgetProps) {
       {selectedRangeError && <p className="text-xs text-red-500 mb-3">{selectedRangeError}</p>}
       {availability && unavailableDates.size > 0 && (
         <p className="text-xs text-gray-500 mb-3">Các ngày đã đặt hoặc bị chủ nhà khoá sẽ không thể thanh toán.</p>
+      )}
+      {requirementLabels.length > 0 && (
+        <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          <p>Chủ nhà yêu cầu {requirementLabels.join(', ')}.</p>
+          {missingRequirements.length > 0 && (
+            <p className="mt-1 text-blue-700">Tài khoản hiện thiếu: {missingRequirements.join(', ')}.</p>
+          )}
+        </div>
       )}
       {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
       <button

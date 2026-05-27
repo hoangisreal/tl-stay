@@ -1,10 +1,14 @@
-const requireRole = (role) => (req, res, next) => {
-  const allowed = Array.isArray(role) ? role : [role];
-  if (!allowed.includes(req.user?.role)) {
-    res.status(403);
-    return next(new Error('Forbidden'));
-  }
-  next();
+const requireRole = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    next();
+  };
 };
 
+export { requireRole };
 export default requireRole;

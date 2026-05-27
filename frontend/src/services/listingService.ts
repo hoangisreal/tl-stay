@@ -32,6 +32,23 @@ export interface Listing {
   maxAdvanceBookingDays?: number;
   checkInDays?: number[];
   checkOutDays?: number[];
+  customPricing?: { date: string; price: number }[];
+  weekendPriceMultiplier?: number;
+  monthlyDiscount?: number;
+  cancellationPolicy?: 'flexible' | 'moderate' | 'strict';
+  specialOffers?: {
+    name: string;
+    discountPercentage: number;
+    validFrom: string;
+    validTo: string;
+    minNights: number;
+  }[];
+  guestRequirements?: {
+    verifiedEmail?: boolean;
+    verifiedPhone?: boolean;
+    verifiedId?: boolean;
+    minAge?: number;
+  };
   maxGuests: number;
   bedrooms: number;
   beds: number;

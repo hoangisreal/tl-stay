@@ -2,6 +2,8 @@
 
 Nền tảng đặt phòng homestay.
 
+Tài liệu nghiệp vụ theo actor: [docs/actor-business.md](docs/actor-business.md).
+
 ## Công nghệ sử dụng
 
 ### Backend
@@ -10,6 +12,7 @@ Nền tảng đặt phòng homestay.
 - JWT Authentication (httpOnly cookies)
 - Multer (Tải lên file)
 - Zod (Validation)
+- i18next (Internationalization)
 
 ### Frontend
 - React 19 + TypeScript
@@ -18,6 +21,7 @@ Nền tảng đặt phòng homestay.
 - Zustand (Quản lý state)
 - React Router v6
 - React Hook Form + Zod (Validation form)
+- react-i18next (Internationalization)
 
 ## Cấu trúc dự án
 
@@ -122,21 +126,30 @@ Trong môi trường development, TL-Stay tự động thêm dữ liệu demo kh
 Chạy lệnh seed thủ công khi bạn muốn reset database demo local.
 
 ```bash
-cd backend
 npm run seed
 ```
 
 Dataset demo sau khi seed:
-- 14 users: 1 admin, 5 hosts, 8 guests
+- 20 users: 1 admin, 6 staff, 5 hosts, 8 guests
 - 26 listings trên khắp Việt Nam, bao gồm 24 listings active và 2 listings
   inactive cho Admin Panel moderation
-- 49 bookings với các tình huống confirmed, pending, cancelled, past, và future
+- 49 bookings với các tình huống unpaid, paid, failed, refunded, cancelled,
+  pending, confirmed, past, và future
 - 24 reviews plus guest wishlists cho demos client-side và admin
 - 10 cuộc hội thoại host-guest với 40 messages cho demos inbox/chat
+- Notifications mẫu cho Guest/Host quanh booking, payment, cancel và refund flows
+- Activity logs mẫu cho phân quyền, verification, listing, booking, payment,
+  review, và message flows
 - Tọa độ listings để xem trước vị trí trên OpenStreetMap ở trang chi tiết
 
 Tài khoản demo (password: `password123`):
 - **Admin:** admin@tlstay.com / password123
+- **Customer Support:** hung.support@tlstay.com / password123
+- **Customer Support:** thao.support@tlstay.com / password123
+- **Content Moderator:** quang.moderator@tlstay.com / password123
+- **Content Moderator:** nhi.moderator@tlstay.com / password123
+- **Finance Manager:** tai.finance@tlstay.com / password123
+- **Operations Manager:** duc.operations@tlstay.com / password123
 - **Host:** host@tlstay.com / password123
 - **Host:** mai.host@tlstay.com / password123
 - **Guest:** guest@tlstay.com / password123
@@ -174,29 +187,70 @@ curl http://localhost:5000/api/listings
 
 ## Tính năng
 
-### Xác thực
-- Đăng ký người dùng (Vai trò Guest/Host)
+### Xác thực & Vai trò
+- Đăng ký người dùng với Guest/Host và các tài khoản staff/admin demo
 - Đăng nhập với JWT (httpOnly cookies)
+- Hồ sơ self-service: cập nhật tên, điện thoại, avatar, ngôn ngữ, tiền tệ
+- Self-verification demo cho email, phone, ID
 - Quên/reset mật khẩu với link reset local development
 - Đổi mật khẩu cho người dùng đã đăng nhập
-- Routes được bảo vệ với role-based access control
+- Role-based access control với permissions chi tiết
+- Activity logging cho tất cả hành động quan trọng
 - Tự động redirect khi lỗi 401
 
 ### Listings
 - Tìm kiếm theo vị trí, ngày, giá, số khách
+- Lọc nâng cao: amenities, bedrooms, beds, bathrooms
 - Lọc theo category (Bãi biển, Núi, Thành phố, Cabin, v.v.)
 - Lọc theo khoảng giá
 - Kiểm tra khả dụng cho khoảng ngày
 - Tọa độ listing và xem trước vị trí trên OpenStreetMap
 - Dashboard Host: Tạo, cập nhật, xóa listings
 - Tải lên hình ảnh (tối đa 10 hình, 5MB mỗi hình, JPEG/PNG/WebP)
+- Guest requirements: yêu cầu verification cho guest (email/phone/ID)
 
 ### Hệ thống Đặt phòng
 - Đặt phòng với khoảng ngày và số lượng khách
 - Ngăn chặn đặt trùng với xử lý race condition
-- Phân tích giá chi tiết (subtotal, phí dọn, phí dịch vụ, thuế, tổng)
-- Guest: Xem và hủy bookings
+- Dynamic pricing: custom pricing theo ngày, weekend multiplier, monthly discount
+- Special offers: giảm giá theo thời gian và số đêm tối thiểu
+- Cancellation policies: flexible, moderate, strict với tính toán refund tự động
+- Phân tích giá chi tiết (subtotal, phí dọn, phí dịch vụ, thuế, giảm giá, tổng)
+- Guest: Xem và hủy bookings với refund calculation
 - Host: Xem bookings đến và hủy
+- Mock payment flow với payment events
+
+### Verification & Requirements
+- Admin/Operations/Support verification: email, phone, ID verification cho user
+- Guest self-verification demo để đáp ứng điều kiện đặt phòng
+- Guest requirements per listing: yêu cầu verification trước khi đặt phòng
+- Verified badges hiển thị trên profile
+
+### Notifications
+- Notification REST API theo user hiện tại
+- Badge chưa đọc ở navbar/account menu
+- Trang `/notifications` có phân trang, đánh dấu một thông báo hoặc tất cả đã đọc
+- Seed demo có notifications cho các trạng thái booking/payment/cancel/refund
+
+### Analytics & Reports
+- Admin dashboard: tổng bookings, revenue, listings, users
+- Revenue by month chart (6 tháng)
+- Top listings by rating
+- Bookings by status
+- Host-specific analytics
+
+### Staff Dashboard
+- Staff dùng dashboard dữ liệu thật theo permission: users, listings, bookings,
+  reviews, messages, analytics
+- Mỗi role chỉ thấy tab và thao tác được cấp quyền
+- Customer Support có thể hỗ trợ users/bookings/messages; Content Moderator kiểm
+  duyệt listings/reviews; Finance và Operations xem analytics theo quyền
+
+### Activity Logs
+- Admin có thể xem tất cả activity logs
+- Filter server-side theo action, resource và user
+- Tracking user, IP address, timestamp
+- Pagination support
 
 ### Đánh giá & Xếp hạng
 - Guest có thể đánh giá bookings đã hoàn thành
@@ -212,11 +266,20 @@ curl http://localhost:5000/api/listings
 ### Nhắn tin
 - Guest có thể nhắn tin cho host listing từ trang chi tiết
 - Host có thể nhắn tin cho guest từ bookings đến
-- Trang inbox và hội thoại sử dụng REST polling cho demos chat local-friendly
-- Admin có thể kiểm tra tin nhắn gần đây và số lượng tin nhắn
+- Trang inbox và hội thoại sử dụng REST polling
+- Admin có thể kiểm tra tin nhắn gần đây
 
-### UI/UX
-- Thiết kế responsive với Tailwind CSS
+### Internationalization (i18n)
+- Hỗ trợ đa ngôn ngữ: Tiếng Việt, English
+- Language switcher component
+- Backend và frontend i18n integration
+
+### UI/UX & Accessibility
+- Thiết kế responsive với Tailwind CSS (mobile, tablet, desktop)
+- Loading states với LoadingSpinner component
+- Error handling với ErrorBoundary và ErrorMessage
+- ARIA attributes cho accessibility
+- Skip-to-content link cho keyboard navigation
 - Lightbox hình ảnh để xem photos listing
 - Tab category để lọc nhanh
 - Hiển thị sao xếp hạng
@@ -231,6 +294,8 @@ curl http://localhost:5000/api/listings
 - `POST /api/auth/login` - Đăng nhập
 - `POST /api/auth/logout` - Đăng xuất
 - `GET /api/auth/me` - Lấy user hiện tại
+- `PATCH /api/auth/me/profile` - Cập nhật profile self-service
+- `PATCH /api/auth/me/verification` - Bật verification demo cho chính user
 - `POST /api/auth/forgot-password` - Tạo link reset mật khẩu
 - `POST /api/auth/reset-password` - Reset mật khẩu với token
 - `PATCH /api/auth/change-password` - Đổi mật khẩu khi đã đăng nhập
@@ -250,6 +315,8 @@ curl http://localhost:5000/api/listings
 - `GET /api/bookings/host` - Lấy bookings của host (Chỉ Host)
 - `GET /api/bookings/:id` - Lấy booking theo ID
 - `GET /api/bookings/quote` - Lấy báo giá (public)
+- `POST /api/bookings/:id/payments/mock` - Thanh toán mock
+- `POST /api/bookings/payments/webhook` - Webhook payment mock
 - `PATCH /api/bookings/:id/cancel` - Hủy booking
 
 ### Reviews
@@ -269,10 +336,17 @@ curl http://localhost:5000/api/listings
 - `POST /api/conversations/:id/messages` - Gửi tin nhắn
 - `PATCH /api/conversations/:id/read` - Đánh dấu hội thoại đã đọc
 
+### Notifications
+- `GET /api/notifications` - Lấy notifications của user hiện tại
+- `GET /api/notifications/unread-count` - Đếm notifications chưa đọc
+- `PATCH /api/notifications/:id/read` - Đánh dấu một notification đã đọc
+- `PATCH /api/notifications/read-all` - Đánh dấu tất cả notification đã đọc
+
 ### Admin
 - `GET /api/admin/stats` - Thống kê dashboard
 - `GET /api/admin/users` - Quản lý users
 - `PATCH /api/admin/users/:id/role` - Cập nhật vai trò user
+- `PATCH /api/admin/users/:id/verify` - Verify user (email/phone/id)
 - `GET /api/admin/listings` - Quản lý listings
 - `PATCH /api/admin/listings/:id/status` - Hiện/ẩn listing
 - `GET /api/admin/bookings` - Quản lý bookings
@@ -280,13 +354,24 @@ curl http://localhost:5000/api/listings
 - `GET /api/admin/reviews` - Quản lý đánh giá
 - `DELETE /api/admin/reviews/:id` - Xóa đánh giá
 - `GET /api/admin/messages` - Kiểm tra tin nhắn gần đây
+- `GET /api/admin/activity-logs` - Xem activity logs
+
+### Analytics
+- `GET /api/analytics/overview` - Thống kê tổng quan (Admin)
+- `GET /api/analytics/revenue` - Doanh thu theo tháng (Admin)
+- `GET /api/analytics/top-listings` - Top listings (Admin)
+- `GET /api/analytics/bookings` - Bookings theo status (Admin)
+- `GET /api/analytics/bookings-by-status` - Bookings theo status (Admin)
+- `GET /api/analytics/host` - Thống kê host hiện tại (Host)
 
 ## Database Models
 
 ### User
 - name, email, passwordHash
-- role (guest/host/admin)
-- avatarUrl
+- role (guest/host/admin/customer_support/content_moderator/finance_manager/operations_manager)
+- phone, avatarUrl
+- verified (email, phone, id)
+- preferences (language, currency)
 - favoriteListings (mảng listing IDs)
 
 ### Listing
@@ -298,6 +383,11 @@ curl http://localhost:5000/api/listings
 - amenities (mảng)
 - images (mảng)
 - category (enum)
+- customPricing (date, price)
+- weekendPriceMultiplier, monthlyDiscount
+- cancellationPolicy (flexible/moderate/strict)
+- specialOffers (name, discountPercentage, validFrom, validTo, minNights)
+- guestRequirements (verifiedEmail, verifiedPhone, verifiedId, minAge)
 - avgRating, reviewCount
 - isActive (boolean)
 
@@ -306,7 +396,9 @@ curl http://localhost:5000/api/listings
 - guest (User reference)
 - checkIn, checkOut, guests
 - nights, subtotal, cleaningFee, serviceFee, tax, totalPrice
-- status (pending/confirmed/cancelled)
+- specialOfferDiscount, monthlyDiscount
+- status (unpaid/paid/refunded/failed/cancelled/pending/confirmed)
+- payment mock metadata
 
 ### Review
 - listing (Listing reference)
@@ -323,4 +415,9 @@ curl http://localhost:5000/api/listings
 - conversation, sender
 - body, readAt
 
-
+### Notification
+- user (User reference)
+- type (booking_created/booking_paid/booking_cancelled/booking_refunded/booking_failed)
+- title, body
+- booking, listing references
+- readAt

@@ -6,6 +6,7 @@ import Message from '../models/Message.js';
 import User from '../models/User.js';
 import { ACTIVE_BOOKING_STATUSES } from '../utils/availability.js';
 import { objectIdSchema } from '../utils/validators.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 const idParamsSchema = z.object({
   id: objectIdSchema,
@@ -184,6 +185,7 @@ export const sendMessage = async (req, res, next) => {
     });
     conversation.lastMessageAt = message.createdAt;
     await conversation.save();
+    await logActivity(req.user._id, 'message.sent', 'message', message._id, { conversation: conversation._id }, req);
     res.status(201).json(await message.populate('sender', 'name avatarUrl'));
   } catch (err) {
     next(err);

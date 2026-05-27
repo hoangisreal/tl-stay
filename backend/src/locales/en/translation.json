@@ -1,0 +1,34 @@
+{
+  "auth": {
+    "loginSuccess": "Login successful",
+    "logoutSuccess": "Logout successful",
+    "registerSuccess": "Registration successful",
+    "invalidCredentials": "Invalid email or password",
+    "emailExists": "Email already exists",
+    "unauthorized": "Please login",
+    "accessDenied": "Access denied"
+  },
+  "booking": {
+    "created": "Booking created successfully",
+    "cancelled": "Booking cancelled",
+    "notAvailable": "Property not available for these dates",
+    "notFound": "Booking not found"
+  },
+  "listing": {
+    "created": "Listing created successfully",
+    "updated": "Listing updated successfully",
+    "deleted": "Listing deleted successfully",
+    "notFound": "Listing not found"
+  },
+  "review": {
+    "created": "Review submitted successfully",
+    "deleted": "Review deleted successfully",
+    "alreadyReviewed": "You have already reviewed this booking"
+  },
+  "validation": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email",
+    "minLength": "Minimum {{min}} characters",
+    "maxLength": "Maximum {{max}} characters"
+  }
+}

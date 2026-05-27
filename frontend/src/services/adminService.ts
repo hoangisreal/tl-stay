@@ -35,12 +35,31 @@ export interface AdminReview {
   createdAt: string;
 }
 
+export type ActivityLogDetails = Record<string, unknown>;
+
+export interface ActivityLog {
+  _id: string;
+  user: { _id: string; name: string; email: string; role?: AuthUser['role'] };
+  action: string;
+  resource: string;
+  resourceId?: string;
+  details?: ActivityLogDetails;
+  ipAddress?: string;
+  createdAt: string;
+}
+
 export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   total: number;
   pages: number;
   [key: string]: T[] | number;
+}
+
+export interface ActivityLogFilters {
+  action?: string;
+  resource?: string;
+  user?: string;
 }
 
 export const fetchAdminStats = () => apiClient.get<AdminStats>('/admin/stats');
@@ -50,6 +69,11 @@ export const fetchAdminUsers = (page = 1, limit = 20) =>
 
 export const updateAdminUserRole = (id: string, role: AdminUser['role']) =>
   apiClient.patch<AdminUser>(`/admin/users/${id}/role`, { role });
+
+export const verifyAdminUser = (
+  id: string,
+  verified: Partial<AdminUser['verified']>
+) => apiClient.patch<{ user: AdminUser }>(`/admin/users/${id}/verify`, verified);
 
 export const fetchAdminListings = (page = 1, limit = 20) =>
   apiClient.get<{ listings: Listing[] } & PaginatedResponse<Listing>>('/admin/listings', { params: { page, limit } });
@@ -71,3 +95,8 @@ export const deleteAdminReview = (id: string) =>
 
 export const fetchAdminMessages = (page = 1, limit = 20) =>
   apiClient.get<{ messages: AdminMessage[] } & PaginatedResponse<AdminMessage>>('/admin/messages', { params: { page, limit } });
+
+export const fetchActivityLogs = (page = 1, limit = 20, filters: ActivityLogFilters = {}) =>
+  apiClient.get<{ logs: ActivityLog[] } & PaginatedResponse<ActivityLog>>('/admin/activity-logs', {
+    params: { page, limit, ...filters },
+  });

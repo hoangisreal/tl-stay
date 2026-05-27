@@ -2,7 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth.ts';
 
-export default function AccountMenu() {
+interface AccountMenuProps {
+  unreadCount?: number;
+}
+
+export default function AccountMenu({ unreadCount = 0 }: AccountMenuProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -32,12 +36,34 @@ export default function AccountMenu() {
         <div className="w-7 h-7 rounded-full bg-rose-500 flex items-center justify-center text-white text-xs font-bold">
           {user?.name?.charAt(0).toUpperCase()}
         </div>
+        {unreadCount > 0 && (
+          <span className="w-2 h-2 rounded-full bg-rose-500" aria-label={`${unreadCount} thông báo chưa đọc`} />
+        )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+        <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
           <p className="px-4 py-2 text-sm font-semibold text-gray-700 truncate border-b border-gray-100">
             {user?.name}
           </p>
+          <Link
+            to="/account/profile"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Hồ sơ tài khoản
+          </Link>
+          <Link
+            to="/notifications"
+            onClick={() => setOpen(false)}
+            className="flex items-center justify-between gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <span>Thông báo</span>
+            {unreadCount > 0 && (
+              <span className="text-xs font-semibold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </Link>
           {user?.role === 'host' && (
             <>
               <Link

@@ -14,6 +14,7 @@ import {
   normalizeBlockedDates,
 } from '../utils/availability.js';
 import { dateOnlySchema, objectIdSchema, parseDateOnly } from '../utils/validators.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -117,6 +118,10 @@ const listingQuerySchema = z
     category: z.enum(CATEGORIES).optional(),
     checkIn: dateOnlySchema.optional(),
     checkOut: dateOnlySchema.optional(),
+    amenities: z.string().optional(),
+    bedrooms: z.coerce.number().int().min(1).optional(),
+    beds: z.coerce.number().int().min(1).optional(),
+    bathrooms: z.coerce.number().int().min(1).optional(),
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(50).default(12),
     sort: z.enum(SORT_OPTIONS).default('-createdAt'),
@@ -175,6 +180,7 @@ export const create = async (req, res, next) => {
       ...availabilityData,
       images,
     });
+    await logActivity(req.user._id, 'listing.created', 'listing', listing._id, { title: listing.title }, req);
     res.status(201).json(listing);
   } catch (err) {
     await removeImageFiles(images);
@@ -189,7 +195,7 @@ export const getAll = async (req, res, next) => {
       res.status(400);
       return next(new Error(parsed.error.errors[0].message));
     }
-    const { location, minPrice, maxPrice, guests, category, checkIn, checkOut, page, limit, sort } = parsed.data;
+    const { location, minPrice, maxPrice, guests, category, checkIn, checkOut, amenities, bedrooms, beds, bathrooms, page, limit, sort } = parsed.data;
     const filter = { isActive: true };
 
     if (location) filter['location.city'] = { $regex: escapeRegExp(location), $options: 'i' };
@@ -200,6 +206,14 @@ export const getAll = async (req, res, next) => {
       if (maxPrice !== undefined) filter.pricePerNight.$lte = maxPrice;
     }
     if (guests) filter.maxGuests = { $gte: guests };
+    if (amenities) {
+      const amenitiesList = amenities.split(',').map(a => a.trim()).filter(Boolean);
+      if (amenitiesList.length > 0) filter.amenities = { $all: amenitiesList };
+    }
+    if (bedrooms) filter.bedrooms = { $gte: bedrooms };
+    if (beds) filter.beds = { $gte: beds };
+    if (bathrooms) filter.bathrooms = { $gte: bathrooms };
+
     if (checkIn && checkOut) {
       const [bookedIds, blockedIds] = await Promise.all([
         Booking.distinct('listing', {
@@ -307,6 +321,7 @@ export const update = async (req, res, next) => {
     }
     const updated = await Listing.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (newImages.length && replace) await removeImageFiles(req.listing.images);
+    await logActivity(req.user._id, 'listing.updated', 'listing', updated._id, { fields: Object.keys(updateData) }, req);
     res.json(updated);
   } catch (err) {
     await removeImageFiles(newImages);
@@ -324,6 +339,7 @@ export const deleteListing = async (req, res, next) => {
     if (bookingCount > 0 || reviewCount > 0) {
       req.listing.isActive = false;
       await req.listing.save();
+      await logActivity(req.user._id, 'listing.deactivated', 'listing', req.listing._id, { bookingCount, reviewCount }, req);
       return res.json({ message: 'Listing deactivated' });
     }
 
@@ -332,6 +348,7 @@ export const deleteListing = async (req, res, next) => {
       BookingHold.deleteMany({ listing: req.params.id }),
       Listing.findByIdAndDelete(req.params.id),
     ]);
+    await logActivity(req.user._id, 'listing.deleted', 'listing', req.listing._id, { title: req.listing.title }, req);
     res.json({ message: 'Listing deleted' });
   } catch (err) {
     next(err);

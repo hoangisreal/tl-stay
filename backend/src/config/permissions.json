@@ -1,0 +1,54 @@
+{
+  "admin": ["*"],
+  "customer_support": [
+    "users:read",
+    "users:verify",
+    "bookings:read",
+    "bookings:update",
+    "messages:read",
+    "messages:create",
+    "reviews:read"
+  ],
+  "content_moderator": [
+    "listings:read",
+    "listings:update",
+    "reviews:read",
+    "reviews:delete",
+    "messages:read"
+  ],
+  "finance_manager": [
+    "bookings:read",
+    "users:read",
+    "analytics:read"
+  ],
+  "operations_manager": [
+    "listings:read",
+    "listings:update",
+    "bookings:read",
+    "bookings:update",
+    "users:read",
+    "users:verify",
+    "reviews:read",
+    "messages:read",
+    "analytics:read"
+  ],
+  "host": [
+    "listings:create",
+    "listings:read",
+    "listings:update",
+    "listings:delete",
+    "bookings:read",
+    "messages:read",
+    "messages:create",
+    "reviews:read"
+  ],
+  "guest": [
+    "bookings:create",
+    "bookings:read",
+    "bookings:update",
+    "messages:read",
+    "messages:create",
+    "reviews:create",
+    "reviews:read"
+  ]
+}

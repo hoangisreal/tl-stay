@@ -9,6 +9,8 @@ const bookingSchema = new mongoose.Schema(
     guests: { type: Number, required: true, min: 1 },
     nights: { type: Number, required: true, min: 1 },
     subtotal: { type: Number, required: true, min: 0 },
+    specialOfferDiscount: { type: Number, default: 0, min: 0 },
+    monthlyDiscount: { type: Number, default: 0, min: 0 },
     cleaningFee: { type: Number, default: 0, min: 0 },
     serviceFee: { type: Number, default: 0, min: 0 },
     tax: { type: Number, default: 0, min: 0 },

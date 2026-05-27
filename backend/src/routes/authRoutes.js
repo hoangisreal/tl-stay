@@ -8,6 +8,8 @@ import {
   me,
   register,
   resetPassword,
+  updateProfile,
+  updateSelfVerification,
 } from '../controllers/authController.js';
 import requireAuth from '../middlewares/requireAuth.js';
 
@@ -26,6 +28,8 @@ router.post('/register', authLimiter, register);
 router.post('/login', authLimiter, login);
 router.post('/logout', logout);
 router.get('/me', requireAuth, me);
+router.patch('/me/profile', requireAuth, updateProfile);
+router.patch('/me/verification', requireAuth, updateSelfVerification);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/reset-password', authLimiter, resetPassword);
 router.patch('/change-password', requireAuth, changePassword);

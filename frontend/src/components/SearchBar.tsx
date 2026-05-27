@@ -25,18 +25,22 @@ export default function SearchBar() {
     <form
       onSubmit={handleSearch}
       className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-white border border-gray-200 rounded-2xl shadow-md px-4 py-3 w-full max-w-3xl"
+      role="search"
+      aria-label="Tìm kiếm homestay"
     >
       <div className="flex flex-col flex-1 min-w-0">
-        <span className="text-xs font-semibold text-gray-700">Địa điểm</span>
+        <label htmlFor="search-location" className="text-xs font-semibold text-gray-700">Địa điểm</label>
         <input
+          id="search-location"
           type="text"
           placeholder="Tìm kiếm thành phố..."
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           className="text-sm outline-none text-gray-700 placeholder-gray-400"
+          aria-label="Địa điểm"
         />
       </div>
-      <div className="hidden sm:block w-px bg-gray-200 self-stretch" />
+      <div className="hidden sm:block w-px bg-gray-200 self-stretch" aria-hidden="true" />
       <div className="flex flex-col min-w-0">
         <span className="text-xs font-semibold text-gray-700">Nhận phòng</span>
         <input

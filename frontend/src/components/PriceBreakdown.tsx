@@ -20,6 +20,18 @@ export default function PriceBreakdown({ pricePerNight, breakdown }: PriceBreakd
           <span>{fmt(breakdown.cleaningFee)}</span>
         </div>
       )}
+      {!!breakdown.specialOfferDiscount && (
+        <div className="flex justify-between text-green-700">
+          <span>Ưu đãi đặc biệt</span>
+          <span>-{fmt(breakdown.specialOfferDiscount)}</span>
+        </div>
+      )}
+      {!!breakdown.monthlyDiscount && (
+        <div className="flex justify-between text-green-700">
+          <span>Giảm giá theo tháng</span>
+          <span>-{fmt(breakdown.monthlyDiscount)}</span>
+        </div>
+      )}
       <div className="flex justify-between">
         <span>Phí dịch vụ</span>
         <span>{fmt(breakdown.serviceFee)}</span>

@@ -5,6 +5,7 @@ import Listing from '../models/Listing.js';
 import { PAID_BOOKING_STATUSES } from '../utils/availability.js';
 import { objectIdSchema } from '../utils/validators.js';
 import { recomputeListingRating } from '../utils/reviewUtils.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 const reviewSchema = z.object({
   booking: objectIdSchema,
@@ -121,6 +122,7 @@ export const remove = async (req, res, next) => {
     const listingId = review.listing;
     await review.deleteOne();
     await recomputeListingRating(listingId);
+    await logActivity(req.user._id, 'review.deleted', 'review', review._id, { listing: listingId }, req);
     res.json({ message: 'Review deleted' });
   } catch (err) {
     next(err);

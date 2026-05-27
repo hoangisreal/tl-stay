@@ -4,6 +4,7 @@ import { z } from 'zod';
 import User from '../models/User.js';
 import PasswordResetToken from '../models/PasswordResetToken.js';
 import { signToken, setTokenCookie, clearTokenCookie } from '../utils/jwt.js';
+import { getPermissionsForRole } from '../config/permissions.js';
 
 const PASSWORD_RESET_MESSAGE = 'Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được tạo.';
 const RESET_TOKEN_TTL_MS = 1000 * 60 * 30;
@@ -34,6 +35,31 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(6),
 });
 
+const profileSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120).optional(),
+    phone: z.string().trim().max(30).optional(),
+    avatarUrl: z.string().trim().url().or(z.literal('')).optional(),
+    preferences: z
+      .object({
+        language: z.enum(['vi', 'en']).optional(),
+        currency: z.enum(['VND', 'USD']).optional(),
+      })
+      .optional(),
+  })
+  .passthrough();
+
+const selfVerificationSchema = z
+  .object({
+    email: z.literal(true).optional(),
+    phone: z.literal(true).optional(),
+    id: z.literal(true).optional(),
+  })
+  .strict()
+  .refine((data) => data.email || data.phone || data.id, {
+    message: 'At least one verification flag must be true',
+  });
+
 const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
 const firstClientOrigin = () =>
@@ -43,6 +69,19 @@ const firstClientOrigin = () =>
     .filter(Boolean)[0] || 'http://localhost:5173';
 
 const shouldExposeResetLink = () => ['development', 'test'].includes(process.env.NODE_ENV || 'development');
+
+const authPayload = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  phone: user.phone || '',
+  avatarUrl: user.avatarUrl || '',
+  favoriteListings: user.favoriteListings || [],
+  verified: user.verified || { email: false, phone: false, id: false },
+  preferences: user.preferences || { language: 'vi', currency: 'VND' },
+  permissions: getPermissionsForRole(user.role),
+});
 
 export const register = async (req, res, next) => {
   try {
@@ -61,7 +100,7 @@ export const register = async (req, res, next) => {
     const user = await User.create({ name, email, passwordHash, role: role || 'guest' });
     const token = signToken({ id: user._id, role: user.role });
     setTokenCookie(res, token);
-    res.status(201).json({ _id: user._id, name: user.name, email: user.email, role: user.role });
+    res.status(201).json(authPayload(user));
   } catch (err) {
     next(err);
   }
@@ -87,7 +126,7 @@ export const login = async (req, res, next) => {
     }
     const token = signToken({ id: user._id, role: user.role });
     setTokenCookie(res, token);
-    res.json({ _id: user._id, name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl });
+    res.json(authPayload(user));
   } catch (err) {
     next(err);
   }
@@ -99,8 +138,60 @@ export const logout = (req, res) => {
 };
 
 export const me = (req, res) => {
-  const { _id, name, email, role, avatarUrl, favoriteListings } = req.user;
-  res.json({ _id, name, email, role, avatarUrl, favoriteListings: favoriteListings || [] });
+  res.json(authPayload(req.user));
+};
+
+export const updateProfile = async (req, res, next) => {
+  try {
+    const parsed = profileSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404);
+      return next(new Error('User not found'));
+    }
+
+    const { name, phone, avatarUrl, preferences } = parsed.data;
+    if (name !== undefined) user.name = name;
+    if (phone !== undefined) user.phone = phone;
+    if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+    if (preferences?.language !== undefined) user.preferences.language = preferences.language;
+    if (preferences?.currency !== undefined) user.preferences.currency = preferences.currency;
+
+    await user.save();
+    res.json(authPayload(user));
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateSelfVerification = async (req, res, next) => {
+  try {
+    const parsed = selfVerificationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400);
+      return next(new Error(parsed.error.errors[0].message));
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404);
+      return next(new Error('User not found'));
+    }
+
+    if (parsed.data.email) user.verified.email = true;
+    if (parsed.data.phone) user.verified.phone = true;
+    if (parsed.data.id) user.verified.id = true;
+
+    await user.save();
+    res.json(authPayload(user));
+  } catch (err) {
+    next(err);
+  }
 };
 
 export const forgotPassword = async (req, res, next) => {
